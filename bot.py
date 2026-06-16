@@ -1,5 +1,5 @@
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 import asyncio
 import os
@@ -7,220 +7,155 @@ import random
 
 TOKEN = os.getenv("TOKEN")
 
+if not TOKEN:
+    raise ValueError("TOKEN is not set")
+
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 games = {}
 
+# =========================
+# 🎯 SCENARIOS (FULL LIST)
+# =========================
 SCENARIOS = [
-    "وقتی ساعت ۳ صبح یادت می‌افتد فردا امتحان داری!",
-    "وقتی شارژ گوشی به ۱٪ رسیده!",
-    "وقتی اشتباهی پیام را برای رئیست فرستادی!",
-    "وقتی مادرت می‌گوید مهمان داریم!",
-    "وقتی اینترنت وسط بازی قطع می‌شود!",
-    "وقتی دوستت می‌گوید فقط یک سوال کوچیک دارم!",
-    "وقتی رمز کارت یادت نمی‌آید!",
-    "وقتی متوجه می‌شوی امروز تعطیل نیست!",
-    "وقتی غذا را سفارش دادی و اشتباه آوردند!",
-    "وقتی از خواب بیدار می‌شوی و فکر می‌کنی دیر شده!",
-    "وقتی با اعتماد به نفس وارد اتاق می‌شوی و می‌فهمی اتاق اشتباه بوده!",
-    "وقتی جلوی آینه ژست می‌گیری و کسی پشت سرت می‌خندد!",
-    "وقتی با عجله می‌دوی ولی می‌بینی در بسته بوده!",
-    "وقتی می‌خواهی اسم کسی را صدا بزنی و یادت نمی‌آید!",
-    "وقتی می‌گویی «من دارم می‌رم» و تازه لباس نپوشیدی!",
-    "وقتی با صدای بلند آهنگ می‌خوانی و می‌فهمی هدفونت وصل نبوده!",
-    "وقتی روی صندلی می‌نشینی و می‌فهمی از قبل خیس بوده!",
-    "وقتی می‌خواهی خیلی شیک حرف بزنی ولی زبانت می‌گیرد!",
-    "وقتی به سطل زباله می‌زنی ولی توپ نیست، مچاله کاغذه!",
-    "وقتی داری از پله‌ها پایین می‌آیی و یک پله کم می‌آوری!",
-    "وقتی پیام «الان میام» را فرستادی و هنوز از تخت بلند نشدی!",
-    "وقتی برای کسی دست تکان می‌دهی و می‌فهمی با تو نبوده!",
-    "وقتی در آسانسور فقط تویی و یک نفر دیگر و هر دو به دیوار نگاه می‌کنید!",
-    "وقتی می‌خواهی خونسرد باشی ولی لیوان از دستت لیز می‌خورد!",
-    "وقتی می‌فهمی کلاهت را ۳ ساعت روی سرت گذاشته بودی ولی برعکس!",
-    "وقتی با اعتماد می‌گویی «این که کاری نداره» و بعد گیر می‌کنی!",
-    "وقتی در جمع می‌خندی و بعد می‌پرسی «ببخشید به چی می‌خندید؟»!",
-    "وقتی نان تست از دستت می‌افتد و دقیقاً سمت کره‌ای می‌خورد!",
-    "وقتی می‌خواهی بی‌صدا وارد خانه شوی و در جیرجیر می‌کند!",
-    "وقتی اسمت را صدا می‌زنند و تو از جایت می‌پری ولی منظورشان یکی دیگر بوده!",
-    "وقتی خودت را جمع‌وجور می‌کنی که فوتبالیست‌طور توپ بزنی و می‌خوری زمین!",
-    "وقتی برای عکس گرفتن آماده می‌شوی ولی دوربین بسته شده!",
-    "وقتی گوشی را برداشتی تا ساعت را نگاه کنی و یادت می‌رود!",
-    "وقتی می‌گویی «الان دقیق می‌دونم کجاست» و پنج دقیقه بعد هیچ‌چیز پیدا نمی‌کنی!",
-    "وقتی به موهایت ژل زدی ولی باد از همه قوی‌تر است!",
-    "وقتی توی صف می‌ایستی و می‌فهمی اصلاً صف مال تو نبوده!",
-    "وقتی می‌خواهی از یک گفت‌وگوی خجالت‌آور فرار کنی و کسی صدایت می‌کند!",
-    "وقتی وسط صحبت ناگهان یادت می‌رود داشتی چه می‌گفتی!",
-    "وقتی چشم‌هایت را می‌بندی که نخوابی، ولی دقیقاً خوابت می‌برد!",
-    "وقتی می‌خواهی چیزی را سریع بخوری و زبانت می‌سوزد!",
-    "وقتی لباس جدید می‌پوشی و همان روز باران می‌آید!",
-    "وقتی می‌خواهی خیلی جدی باشی ولی یک خنده ناگهانی همه‌چیز را خراب می‌کند!",
-    "وقتی موقع سلام دادن، هم‌زمان می‌روی برای دست دادن و بغل!",
-    "وقتی با شور و شوق وارد آشپزخانه می‌شوی و یادت می‌آید برای غذا نیامده بودی!",
-    "وقتی لپ‌تاپت را باز می‌کنی و می‌بینی ۷۲ درصد شارژ دارد، ولی شارژرش آنجاست!",
-    "وقتی دکمه ارسال را زدی و تازه فهمیدی غلط املایی داری!",
-    "وقتی می‌خواهی بی‌صدا بخندی ولی صدات مثل غاز درمی‌آید!",
-    "وقتی سعی می‌کنی از روی یک چیز کوچک بپری و خیلی نمایشی زمین می‌خوری!",
-    "وقتی می‌خواهی منطقی صحبت کنی ولی عصبانیت اجازه نمی‌دهد!",
-    "وقتی فکر می‌کنی یکی داره نگات می‌کنه، برمی‌گردی و واقعاً داره نگات می‌کنه!",
-    "وقتی زنگ می‌زنی به دوستت و می‌گه الان داشتم بهت زنگ می‌زدم!",
-    "وقتی کفشت را پیدا نمی‌کنی و می‌بینی یکی پای خودته!",
-    "وقتی می‌خواهی آرام آب بخوری و ناگهان سرفه‌ات می‌گیرد!",
-    "وقتی در مهمانی اسم کسی را فراموش می‌کنی و فقط لبخند می‌زنی!",
-    "وقتی می‌خواهی خیلی حرفه‌ای فایل را ذخیره کنی و کامپیوتر هنگ می‌کند!",
-    "وقتی با خودت می‌گویی فقط ۵ دقیقه می‌خوابم و ۳ ساعت بعد بیدار می‌شوی!",
-    "وقتی چیزی را زمین می‌اندازی و همه دقیقاً نگاه می‌کنند!",
-    "وقتی می‌خواهی از در رد شوی و لباست به دستگیره گیر می‌کند!",
-    "وقتی می‌بینی چیزی که دنبالش بودی، دقیقاً جلوی چشمت بوده!",
-    "وقتی می‌خواهی جدی باشی ولی یک اتفاق بی‌ربط کل فضا را منفجر می‌کند!"
+"وقتی ساعت ۳ صبح یادت می‌افتد فردا امتحان داری!",
+"وقتی شارژ گوشی به ۱٪ رسیده!",
+"وقتی اشتباهی پیام را برای رئیست فرستادی!",
+"وقتی مادرت می‌گوید مهمان داریم!",
+"وقتی اینترنت وسط بازی قطع می‌شود!",
+"وقتی دوستت می‌گوید فقط یک سوال کوچیک دارم!",
+"وقتی رمز کارت یادت نمی‌آید!",
+"وقتی متوجه می‌شوی امروز تعطیل نیست!",
+"وقتی غذا را سفارش دادی و اشتباه آوردند!",
+"وقتی از خواب بیدار می‌شوی و فکر می‌کنی دیر شده!",
+"وقتی با اعتماد به نفس وارد اتاق می‌شوی و می‌فهمی اتاق اشتباه بوده!",
+"وقتی جلوی آینه ژست می‌گیری و کسی پشت سرت می‌خندد!",
+"وقتی با عجله می‌دوی ولی می‌بینی در بسته بوده!",
+"وقتی می‌خواهی اسم کسی را صدا بزنی و یادت نمی‌آید!",
+"وقتی می‌گویی «من دارم می‌رم» و تازه لباس نپوشیدی!",
+"وقتی با صدای بلند آهنگ می‌خوانی و می‌فهمی هدفونت وصل نبوده!",
+"وقتی روی صندلی می‌نشینی و می‌فهمی از قبل خیس بوده!",
+"وقتی می‌خواهی خیلی شیک حرف بزنی ولی زبانت می‌گیرد!",
+"وقتی به سطل زباله می‌زنی ولی توپ نیست، مچاله کاغذه!",
+"وقتی داری از پله‌ها پایین می‌آیی و یک پله کم می‌آوری!",
+"وقتی پیام «الان میام» را فرستادی و هنوز از تخت بلند نشدی!",
+"وقتی برای کسی دست تکان می‌دهی و می‌فهمی با تو نبوده!",
+"وقتی در آسانسور فقط تویی و یک نفر دیگر و هر دو به دیوار نگاه می‌کنید!",
+"وقتی می‌خواهی خونسرد باشی ولی لیوان از دستت لیز می‌خورد!",
+"وقتی فکر می‌کنی میکروفون خاموشه ولی روشن بوده!",
+"وقتی وسط صحبت یادت می‌رود داشتی چی می‌گفتی!",
+"وقتی گوشی رو دستته ولی دنبالش می‌گردی!",
+"وقتی فکر می‌کنی کسی نگات می‌کنه و واقعاً داره نگات می‌کنه!",
+"وقتی می‌خوای خفن باشی ولی زمین می‌خوری!",
+"وقتی پیام رو اشتباهی برای گروه می‌فرستی!",
+"وقتی وسط خنده سرفه می‌کنی!",
+"وقتی می‌خوای سریع جواب بدی ولی اینترنت هنگ می‌کنه!",
+"وقتی فکر می‌کنی زنگ خورد ولی تو ذهنت بوده!",
+"وقتی در بسته‌ست ولی هلش می‌دی!",
+"وقتی می‌خوای آروم در رو ببندی ولی صداش کل خونه رو می‌لرزونه!",
+"وقتی فکر می‌کنی فیلمو دیدی ولی آخرش یادت نیست!",
+"وقتی می‌خوای حرفه‌ای تایپ کنی ولی کیبورد قاطی می‌کنه!",
+"وقتی می‌خوای از در رد شی ولی شیشه‌ایه!",
+"وقتی فکر می‌کنی وای‌فای قطعه ولی رمز اشتباهه!",
+"وقتی یه جوک می‌گی و خودت بیشتر می‌خندی!",
+"وقتی می‌خوای پیامو ادیت کنی ولی پاکش می‌کنی!",
+"وقتی می‌خوای جدی باشی ولی خنده می‌گیره!"
 ]
 
-
+# =========================
+# 🎮 GAME DATA
+# =========================
 def get_game(chat_id):
     if chat_id not in games:
         games[chat_id] = {
             "started": False,
             "players": {},
             "round": 0,
-            "submitted": set()
+            "submitted": set(),
+            "scores": {},
+            "gifs": {},
+            "used_scenarios": [],
+            "votes": {}
         }
-
     return games[chat_id]
 
+# =========================
+# 🚀 INFO COMMAND (NEW)
+# =========================
+@dp.message(Command("info"))
+async def info(message: Message):
+    await message.answer("🛠 ساخته شده توسط @Jack_landon")
 
+# =========================
+# 🚀 START
+# =========================
 @dp.message(Command("start"))
 async def start(message: Message):
-    await message.answer(
-        "🎉 ربات GIF Challenge فعال است!\n\n"
-        "برای دیدن راهنما:\n"
-        "/helpp"
-    )
+    await message.answer("🎮 GIF Challenge Bot فعال است!\n\n/newgame")
 
-
-@dp.message(Command("helpp"))
-async def helpp(message: Message):
-    await message.answer(
-        "🎮 راهنمای بازی\n\n"
-        "🆕 /newgame\n"
-        "ساخت بازی جدید\n\n"
-        "👤 /join\n"
-        "ورود به بازی\n\n"
-        "👥 /players\n"
-        "نمایش بازیکنان\n\n"
-        "🚀 /startgame\n"
-        "شروع بازی\n\n"
-        "🛑 /end_game\n"
-        "پایان بازی\n\n"
-        "🎯 نحوه بازی:\n"
-        "ربات یک موقعیت خنده‌دار ارسال می‌کند.\n"
-        "همه بازیکنان یک GIF می‌فرستند.\n"
-        "بعد از ارسال همه GIFها، راند بعدی شروع می‌شود."
-    )
-
-
+# =========================
+# 🆕 NEW GAME
+# =========================
 @dp.message(Command("newgame"))
 async def newgame(message: Message):
-    game = get_game(message.chat.id)
+    games[message.chat.id] = {
+        "started": False,
+        "players": {},
+        "round": 0,
+        "submitted": set(),
+        "scores": {},
+        "gifs": {},
+        "used_scenarios": [],
+        "votes": {}
+    }
 
-    game["started"] = False
-    game["players"] = {}
-    game["round"] = 0
-    game["submitted"] = set()
+    await message.answer("🎮 بازی جدید ساخته شد!\n\n/join")
 
-    await message.answer(
-        "🎮 بازی جدید ساخته شد!\n\n"
-        "⏳ منتظر بازیکنان...\n\n"
-        "برای ورود:\n"
-        "/join"
-    )
-
-
+# =========================
+# 👤 JOIN
+# =========================
 @dp.message(Command("join"))
 async def join(message: Message):
     game = get_game(message.chat.id)
 
     if game["started"]:
-        await message.answer("⚠️ بازی شروع شده است.")
-        return
+        return await message.answer("⚠️ بازی شروع شده")
 
-    user_id = message.from_user.id
+    uid = message.from_user.id
 
-    if user_id in game["players"]:
-        await message.answer("⚠️ شما قبلاً وارد بازی شده‌اید.")
-        return
+    if uid in game["players"]:
+        return await message.answer("⚠️ قبلاً وارد شدی")
 
-    game["players"][user_id] = message.from_user.first_name
+    game["players"][uid] = message.from_user.first_name
+    game["scores"][uid] = 0
 
-    await message.answer(
-        f"✅ {message.from_user.first_name} وارد بازی شد.\n\n"
-        f"👥 تعداد بازیکنان: {len(game['players'])}"
-    )
+    await message.answer(f"✅ {message.from_user.first_name} وارد شد")
 
-
-@dp.message(Command("players"))
-async def players(message: Message):
-    game = get_game(message.chat.id)
-
-    if not game["players"]:
-        await message.answer("❌ هنوز بازیکنی وارد نشده است.")
-        return
-
-    text = "👥 بازیکنان حاضر:\n\n"
-
-    for i, player in enumerate(game["players"].values(), start=1):
-        text += f"{i}. {player}\n"
-
-    text += "\n🚀 /startgame"
-
-    await message.answer(text)
-
-
+# =========================
+# 🚀 START GAME
+# =========================
 @dp.message(Command("startgame"))
 async def startgame(message: Message):
     game = get_game(message.chat.id)
 
     if len(game["players"]) < 2:
-        await message.answer("❌ حداقل ۲ بازیکن لازم است.")
-        return
-
-    if game["started"]:
-        await message.answer("⚠️ بازی قبلاً شروع شده است.")
-        return
+        return await message.answer("❌ حداقل ۲ نفر لازم است")
 
     game["started"] = True
     game["round"] = 1
     game["submitted"] = set()
+    game["gifs"] = {}
+    game["votes"] = {}
 
     scenario = random.choice(SCENARIOS)
+    game["used_scenarios"].append(scenario)
 
-    await message.answer(
-        f"🚀 بازی شروع شد!\n\n"
-        f"🎯 راند {game['round']}\n\n"
-        f"😂 {scenario}\n\n"
-        "📤 همه بازیکنان یک GIF ارسال کنند."
-    )
+    await message.answer(f"🚀 راند 1\n\n😂 {scenario}")
 
-
-@dp.message(Command("end_game"))
-async def end_game(message: Message):
-    game = get_game(message.chat.id)
-
-    if not game["started"]:
-        await message.answer("⚠️ بازی فعالی وجود ندارد.")
-        return
-
-    game["started"] = False
-    game["players"] = {}
-    game["round"] = 0
-    game["submitted"] = set()
-
-    await message.answer(
-        "🏁 بازی پایان یافت.\n\n"
-        "برای شروع مجدد:\n"
-        "/newgame"
-    )
-
-
+# =========================
+# 🎞 GIF HANDLER
+# =========================
 @dp.message(F.animation)
 async def gif_handler(message: Message):
     game = get_game(message.chat.id)
@@ -228,47 +163,69 @@ async def gif_handler(message: Message):
     if not game["started"]:
         return
 
-    user_id = message.from_user.id
+    uid = message.from_user.id
 
-    if user_id not in game["players"]:
+    if uid not in game["players"]:
         return
 
-    if user_id in game["submitted"]:
-        await message.reply(
-            "⛔ شما قبلاً GIF این راند را ارسال کرده‌اید."
-        )
-        return
+    if uid in game["submitted"]:
+        return await message.reply("⛔ قبلاً ارسال کردی")
 
-    game["submitted"].add(user_id)
-
-    remaining = len(game["players"]) - len(game["submitted"])
-
-    await message.reply(
-        f"✅ GIF ثبت شد.\n"
-        f"⏳ {remaining} بازیکن باقی مانده است."
-    )
+    game["submitted"].add(uid)
+    game["gifs"][uid] = message.animation.file_id
 
     if len(game["submitted"]) == len(game["players"]):
-        await message.answer("🎉 همه GIF ها دریافت شد!")
+        await message.answer("🗳 رأی‌گیری شروع شد!")
 
-        await asyncio.sleep(2)
+# =========================
+# 🏆 SCOREBOARD
+# =========================
+@dp.message(Command("scoreboard"))
+async def scoreboard(message: Message):
+    game = get_game(message.chat.id)
 
-        game["round"] += 1
-        game["submitted"] = set()
+    ranking = sorted(game["scores"].items(), key=lambda x: x[1], reverse=True)
 
-        scenario = random.choice(SCENARIOS)
+    text = "🏆 SCOREBOARD\n\n"
+    for i, (uid, score) in enumerate(ranking, 1):
+        text += f"{i}. {game['players'][uid]} - {score}\n"
 
-        await message.answer(
-            f"🎯 راند {game['round']}\n\n"
-            f"😂 {scenario}\n\n"
-            "📤 GIF بعدی خود را ارسال کنید."
-        )
+    await message.answer(text)
 
+# =========================
+# 🏁 END GAME
+# =========================
+@dp.message(Command("end_game"))
+async def end_game(message: Message):
+    game = get_game(message.chat.id)
 
+    ranking = sorted(game["scores"].items(), key=lambda x: x[1], reverse=True)
+
+    text = "🏁 FINAL RESULT\n\n"
+
+    for i, (uid, score) in enumerate(ranking, 1):
+        medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else "🏅"
+        text += f"{medal} {game['players'][uid]} - {score}\n"
+
+    games[message.chat.id] = {
+        "started": False,
+        "players": {},
+        "round": 0,
+        "submitted": set(),
+        "scores": {},
+        "gifs": {},
+        "used_scenarios": [],
+        "votes": {}
+    }
+
+    await message.answer(text)
+
+# =========================
+# 🚀 RUN BOT
+# =========================
 async def main():
-    print("Bot Started...")
+    print("Bot started...")
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
