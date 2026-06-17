@@ -27,7 +27,7 @@ VOTE_TIME = 30
 BOT_DISABLED = False
 
 # =========================
-# MIDDLEWARE
+# MIDDLEWARE (FIXED)
 # =========================
 
 class DisableMiddleware(BaseMiddleware):
@@ -36,12 +36,13 @@ class DisableMiddleware(BaseMiddleware):
 
         global BOT_DISABLED
 
-        if isinstance(event, Message):
-            if BOT_DISABLED and event.text != "/live":
-                return
+        if BOT_DISABLED:
 
-        if isinstance(event, CallbackQuery):
-            if BOT_DISABLED:
+            # فقط /live اجازه دارد
+            if isinstance(event, Message):
+                if event.text != "/live":
+                    return
+            else:
                 return
 
         return await handler(event, data)
@@ -51,10 +52,14 @@ dp.message.middleware(DisableMiddleware())
 dp.callback_query.middleware(DisableMiddleware())
 
 
+# =========================
+# GAME STATE
+# =========================
+
 games = {}
 
 SCENARIOS = [
-        "وقتی ساعت ۳ صبح یادت می‌افتد فردا امتحان داری!",
+     "وقتی ساعت ۳ صبح یادت می‌افتد فردا امتحان داری!",
     "وقتی شارژ گوشی به ۱٪ رسیده!",
     "وقتی اشتباهی پیام را برای رئیست فرستادی!",
     "وقتی مادرت می‌گوید مهمان داریم!",
@@ -115,9 +120,42 @@ SCENARIOS = [
     "وقتی می‌بینی چیزی که دنبالش بودی، دقیقاً جلوی چشمت بوده!",
     "وقتی می‌خواهی جدی باشی ولی یک اتفاق بی‌ربط کل فضا را منفجر می‌کند!"
 ]
+def get_game(chat_id):
+
+    if chat_id not in games:
+        games[chat_id] = {
+            "started": False,
+            "host": None,
+            "players": {},
+            "scores": {},
+            "round": 0,
+            "submitted": set(),
+            "media": {},
+            "votes": {},
+            "used": [],
+            "voting": False,
+            "submit_open": False,
+            "scenario": None
+        }
+
+    return games[chat_id]
+
+
+def new_scenario(game):
+
+    available = [s for s in SCENARIOS if s not in game["used"]]
+
+    if not available:
+        game["used"] = []
+        available = SCENARIOS.copy()
+
+    s = random.choice(available)
+    game["used"].append(s)
+    return s
+
 
 # =========================
-# HELP (NEW INLINE VERSION)
+# HELP
 # =========================
 
 @dp.message(Command("helpp"))
@@ -126,7 +164,7 @@ async def helpp(message: Message):
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="🎮 دستورات بازی", callback_data="help_game"),
+                InlineKeyboardButton(text="🎮 بازی", callback_data="help_game"),
                 InlineKeyboardButton(text="⚙️ مدیریت", callback_data="help_admin")
             ],
             [
@@ -136,7 +174,7 @@ async def helpp(message: Message):
     )
 
     await message.answer(
-        "🎮 GIF Challenge Bot\n\nیکی از گزینه‌ها را انتخاب کن 👇",
+        "🎮 GIF Challenge\nیکی را انتخاب کن:",
         reply_markup=keyboard
     )
 
@@ -145,12 +183,7 @@ async def helpp(message: Message):
 async def help_game(call: CallbackQuery):
 
     await call.message.answer(
-        "🎮 دستورات بازی:\n\n"
-        "/newgame - ساخت بازی\n"
-        "/join - ورود\n"
-        "/startgame - شروع بازی\n"
-        "/players - بازیکنان\n"
-        "/scoreboard - امتیازات"
+        "/newgame\n/join\n/startgame\n/players\n/scoreboard"
     )
     await call.answer()
 
@@ -159,11 +192,7 @@ async def help_game(call: CallbackQuery):
 async def help_admin(call: CallbackQuery):
 
     await call.message.answer(
-        "⚙️ مدیریت:\n\n"
-        "/endvote - پایان رأی\n"
-        "/end_game - پایان بازی\n"
-        "/die - خاموش\n"
-        "/live - روشن"
+        "/endvote\n/end_game\n/die\n/live"
     )
     await call.answer()
 
@@ -172,12 +201,7 @@ async def help_admin(call: CallbackQuery):
 async def help_rules(call: CallbackQuery):
 
     await call.message.answer(
-        "📌 قوانین:\n\n"
-        "• ۱۵ راند\n"
-        "• ۴۵ ثانیه ارسال\n"
-        "• ۳۰ ثانیه رأی گیری\n"
-        "• GIF / عکس / استیکر\n"
-        "• بدون رأی به خود"
+        "15 rounds\n45s send\n30s vote\nGIF/photo/sticker"
     )
     await call.answer()
 
@@ -190,58 +214,118 @@ async def help_rules(call: CallbackQuery):
 async def die(message: Message):
     global BOT_DISABLED
     BOT_DISABLED = True
-    await message.answer("💀 Bot Disabled")
+    await message.answer("💀 OFF")
 
 
 @dp.message(Command("live"))
 async def live(message: Message):
     global BOT_DISABLED
     BOT_DISABLED = False
-    await message.answer("🟢 Bot Enabled")
+    await message.answer("🟢 ON")
 
 
 # =========================
-# GAME (rest unchanged logic)
-# =========================
-
-def get_game(chat_id):
-    if chat_id not in games:
-        games[chat_id] = {
-            "started": False,
-            "host": None,
-            "players": {},
-            "scores": {},
-            "round": 0,
-            "submitted": set(),
-            "media": {},
-            "votes": {},
-            "used_scenarios": [],
-            "voting": False,
-            "submit_open": False,
-            "current_scenario": None
-        }
-    return games[chat_id]
-
-
-def get_new_scenario(game):
-    available = [s for s in SCENARIOS if s not in game["used_scenarios"]]
-
-    if not available:
-        game["used_scenarios"] = []
-        available = SCENARIOS.copy()
-
-    s = random.choice(available)
-    game["used_scenarios"].append(s)
-    return s
-
-
-# =========================
-# START (minimal)
+# START
 # =========================
 
 @dp.message(Command("start"))
 async def start(message: Message):
-    await message.answer("Bot Ready\n/helpp برای راهنما")
+    await message.answer("Bot Ready\n/helpp")
+
+
+# =========================
+# NEW GAME
+# =========================
+
+@dp.message(Command("newgame"))
+async def newgame(message: Message):
+
+    game = get_game(message.chat.id)
+
+    host = message.from_user.id
+
+    game["host"] = host
+    game["players"] = {host: message.from_user.first_name}
+    game["scores"] = {host: 0}
+
+    await message.answer("Game created")
+
+
+# =========================
+# JOIN
+# =========================
+
+@dp.message(Command("join"))
+async def join(message: Message):
+
+    game = get_game(message.chat.id)
+
+    uid = message.from_user.id
+
+    if uid in game["players"]:
+        return
+
+    game["players"][uid] = message.from_user.first_name
+    game["scores"][uid] = 0
+
+    await message.answer("Joined")
+
+
+# =========================
+# START GAME
+# =========================
+
+@dp.message(Command("startgame"))
+async def startgame(message: Message):
+
+    game = get_game(message.chat.id)
+
+    if len(game["players"]) < 2:
+        return await message.answer("Need 2 players")
+
+    game["started"] = True
+    game["round"] = 1
+    game["submit_open"] = True
+
+    game["scenario"] = new_scenario(game)
+
+    await message.answer(
+        f"Round 1\n\n{game['scenario']}"
+    )
+
+
+# =========================
+# PLAYERS
+# =========================
+
+@dp.message(Command("players"))
+async def players(message: Message):
+
+    game = get_game(message.chat.id)
+
+    text = "Players:\n"
+
+    for p in game["players"].values():
+        text += f"- {p}\n"
+
+    await message.answer(text)
+
+
+# =========================
+# SCOREBOARD
+# =========================
+
+@dp.message(Command("scoreboard"))
+async def scoreboard(message: Message):
+
+    game = get_game(message.chat.id)
+
+    text = "Score:\n"
+
+    for uid, score in game["scores"].items():
+        text += f"{game['players'][uid]}: {score}\n"
+
+    await message.answer(text)
 
 
 # =========================
