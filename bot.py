@@ -20,10 +20,12 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 MAX_ROUNDS = 15
+SUBMIT_TIME = 45
+VOTE_TIME = 30
 
 games = {}
 
-SCENARIOS =[
+SCENARIOS = [
     "وقتی ساعت ۳ صبح یادت می‌افتد فردا امتحان داری!",
     "وقتی شارژ گوشی به ۱٪ رسیده!",
     "وقتی اشتباهی پیام را برای رئیست فرستادی!",
@@ -85,8 +87,6 @@ SCENARIOS =[
     "وقتی می‌بینی چیزی که دنبالش بودی، دقیقاً جلوی چشمت بوده!",
     "وقتی می‌خواهی جدی باشی ولی یک اتفاق بی‌ربط کل فضا را منفجر می‌کند!"
 ]
-
-
 def get_game(chat_id):
 
     if chat_id not in games:
@@ -105,13 +105,15 @@ def get_game(chat_id):
 
             "submitted": set(),
 
-            "gifs": {},
+            "media": {},
 
             "votes": {},
 
             "used_scenarios": [],
 
             "voting": False,
+
+            "submit_open": False,
 
             "current_scenario": None
         }
@@ -122,11 +124,8 @@ def get_game(chat_id):
 def get_new_scenario(game):
 
     available = [
-
         s
-
         for s in SCENARIOS
-
         if s not in game["used_scenarios"]
     ]
 
@@ -147,7 +146,175 @@ def get_new_scenario(game):
     return scenario
 
 
-# =========================
+async def auto_finish_submit(chat_id):
+
+    await asyncio.sleep(
+        SUBMIT_TIME
+    )
+
+    game = get_game(chat_id)
+
+    if (
+        game["started"]
+        and
+        game["submit_open"]
+        and
+        not game["voting"]
+    ):
+        await start_voting(
+            chat_id
+        )
+
+
+async def auto_finish_vote(chat_id):
+
+    await asyncio.sleep(
+        VOTE_TIME
+    )
+
+    game = get_game(chat_id)
+
+    if game["voting"]:
+
+        await finish_round(
+            chat_id
+        )
+
+
+async def start_voting(chat_id):
+
+    game = get_game(chat_id)
+
+    if game["voting"]:
+        return
+
+    game["submit_open"] = False
+
+    game["voting"] = True
+
+    asyncio.create_task(
+        auto_finish_vote(
+            chat_id
+        )
+    )
+
+    if not game["media"]:
+
+        await bot.send_message(
+            chat_id,
+            "❌ هیچ GIF، عکس یا استیکری ارسال نشد"
+        )
+
+        await finish_round(
+            chat_id
+        )
+
+        return
+
+    await bot.send_message(
+        chat_id,
+        f"🗳 رأی گیری آغاز شد!\n\n"
+        f"⏰ فقط {VOTE_TIME} ثانیه فرصت رأی دادن دارید"
+    )
+
+    for owner_id, data in game["media"].items():
+
+        media_type = data["type"]
+        file_id = data["file_id"]
+
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=f"👍 رأی به {game['players'][owner_id]}",
+                        callback_data=f"vote_{owner_id}"
+                    )
+                ]
+            ]
+        )
+
+        try:
+
+            if media_type == "gif":
+
+                await bot.send_animation(
+                    chat_id=chat_id,
+                    animation=file_id,
+                    reply_markup=keyboard
+                )
+
+            elif media_type == "photo":
+
+                await bot.send_photo(
+                    chat_id=chat_id,
+                    photo=file_id,
+                    reply_markup=keyboard
+                )
+
+            elif media_type == "sticker":
+
+                await bot.send_sticker(
+                    chat_id=chat_id,
+                    sticker=file_id
+                )
+
+                await bot.send_message(
+                    chat_id,
+                    f"👆 استیکر {game['players'][owner_id]}",
+                    reply_markup=keyboard
+                )
+
+        except Exception:
+            pass
+
+
+async def submit_media(
+    message: Message,
+    file_id: str,
+    media_type: str
+):
+
+    game = get_game(
+        message.chat.id
+    )
+
+    if not game["started"]:
+        return
+
+    if not game["submit_open"]:
+
+        return await message.reply(
+            "⏰ زمان ارسال به پایان رسیده است"
+        )
+
+    if game["voting"]:
+
+        return await message.reply(
+            "⛔ رأی گیری در حال انجام است"
+        )
+
+    uid = message.from_user.id
+
+    if uid not in game["players"]:
+        return
+
+    if uid in game["submitted"]:
+
+        return await message.reply(
+            "⛔ قبلاً فایل ارسال کردی"
+        )
+
+    game["submitted"].add(uid)
+
+    game["media"][uid] = {
+        "type": media_type,
+        "file_id": file_id
+    }
+
+    await message.reply(
+        "✅ فایل ثبت شد"
+    )
+    # =========================
 # HELP
 # =========================
 
@@ -193,20 +360,22 @@ async def helpp(message: Message):
 /end_game
 پایان بازی توسط Host
 
+/die
+خاموش کردن ربات
+
 📌 قوانین
 
-• فقط در گروه کار می‌کند
-• حداقل ۲ بازیکن لازم است
+• GIF ، عکس و استیکر قابل ارسال هستند
 • هر بازی ۱۵ راند دارد
-• هر نفر فقط یک GIF در هر راند
-• هر نفر می‌تواند به چند GIF رأی بدهد
+• زمان ارسال: ۴۵ ثانیه
+• زمان رأی گیری: ۳۰ ثانیه
 • رأی به خود ممنوع است
-• در صورت مساوی همه برندگان امتیاز می‌گیرند
-• بعد از راند ۱۵ بازی تمام می‌شود
 """
 
     await message.answer(text)
-    # =========================
+
+
+# =========================
 # INFO
 # =========================
 
@@ -216,9 +385,8 @@ async def info(message: Message):
     await message.answer(
         "🎮 GIF Challenge Bot\n\n"
         "🛠 سازنده: @Jack_landon\n"
-        "⚡ نسخه: 2.0\n"
-        "🎯 بازی گروهی GIF Challenge\n"
-        "📖 راهنما: /help"
+        "⚡ نسخه: 3.0\n"
+        "🎯 بازی گروهی GIF Challenge"
     )
 
 
@@ -232,10 +400,22 @@ async def start(message: Message):
     await message.answer(
         "🎮 GIF Challenge Bot فعال شد!\n\n"
         "برای ساخت بازی:\n"
-        "/newgame\n\n"
-        "برای راهنما:\n"
-        "/help"
+        "/newgame"
     )
+
+
+# =========================
+# DIE
+# =========================
+
+@dp.message(Command("die"))
+async def die(message: Message):
+
+    await message.answer(
+        "💀 Bot terminated"
+    )
+
+    os._exit(0)
 
 
 # =========================
@@ -284,13 +464,15 @@ async def newgame(message: Message):
 
         "submitted": set(),
 
-        "gifs": {},
+        "media": {},
 
         "votes": {},
 
         "used_scenarios": [],
 
         "voting": False,
+
+        "submit_open": False,
 
         "current_scenario": None
     }
@@ -373,7 +555,9 @@ async def players(message: Message):
         text += f"{i}. {name}\n"
 
     await message.answer(text)
-    # =========================
+
+
+# =========================
 # START GAME
 # =========================
 
@@ -408,11 +592,13 @@ async def startgame(message: Message):
 
     game["submitted"] = set()
 
-    game["gifs"] = {}
+    game["media"] = {}
 
     game["votes"] = {}
 
     game["voting"] = False
+
+    game["submit_open"] = True
 
     scenario = get_new_scenario(
         game
@@ -420,14 +606,19 @@ async def startgame(message: Message):
 
     game["current_scenario"] = scenario
 
+    asyncio.create_task(
+        auto_finish_submit(
+            message.chat.id
+        )
+    )
+
     await message.answer(
         f"🚀 راند 1 از {MAX_ROUNDS}\n\n"
         f"😂 {scenario}\n\n"
-        f"🎞 هر بازیکن یک GIF ارسال کند"
+        f"📤 GIF / عکس / استیکر ارسال کنید\n"
+        f"⏰ فقط {SUBMIT_TIME} ثانیه فرصت دارید"
     )
-
-
-# =========================
+    # =========================
 # SCOREBOARD
 # =========================
 
@@ -514,79 +705,20 @@ async def end_game(message: Message):
     await end_game_internal(
         message.chat.id
     )
-    # =========================
-# GIF HANDLER
+
+
+# =========================
+# GIF ANIMATION
 # =========================
 
 @dp.message(F.animation)
 async def gif_handler(message: Message):
 
-    game = get_game(
-        message.chat.id
+    await submit_media(
+        message,
+        message.animation.file_id,
+        "gif"
     )
-
-    if not game["started"]:
-        return
-
-    if game["voting"]:
-
-        return await message.reply(
-            "⛔ رأی گیری در حال انجام است"
-        )
-
-    uid = message.from_user.id
-
-    if uid not in game["players"]:
-        return
-
-    if uid in game["submitted"]:
-
-        return await message.reply(
-            "⛔ قبلاً GIF ارسال کردی"
-        )
-
-    game["submitted"].add(uid)
-
-    game["gifs"][uid] = (
-        message.animation.file_id
-    )
-
-    await message.reply(
-        "✅ GIF ثبت شد"
-    )
-
-    if len(game["submitted"]) == len(game["players"]):
-
-        game["voting"] = True
-
-        asyncio.create_task(
-            auto_finish_vote(
-                message.chat.id
-            )
-        )
-
-        await message.answer(
-            "🗳 رأی گیری آغاز شد!"
-        )
-
-        for owner_id, gif_id in game["gifs"].items():
-
-            keyboard = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text=f"👍 رأی به {game['players'][owner_id]}",
-                            callback_data=f"vote_{owner_id}"
-                        )
-                    ]
-                ]
-            )
-
-            await bot.send_animation(
-                chat_id=message.chat.id,
-                animation=gif_id,
-                reply_markup=keyboard
-            )
 
 
 # =========================
@@ -594,9 +726,7 @@ async def gif_handler(message: Message):
 # =========================
 
 @dp.message(F.document)
-async def gif_document(
-    message: Message
-):
+async def gif_document(message: Message):
 
     if not message.document:
         return
@@ -607,38 +737,38 @@ async def gif_document(
     ):
         return
 
-    game = get_game(
-        message.chat.id
+    await submit_media(
+        message,
+        message.document.file_id,
+        "gif"
     )
 
-    if not game["started"]:
-        return
 
-    if game["voting"]:
+# =========================
+# PHOTO
+# =========================
 
-        return await message.reply(
-            "⛔ رأی گیری در حال انجام است"
-        )
+@dp.message(F.photo)
+async def photo_handler(message: Message):
 
-    uid = message.from_user.id
-
-    if uid not in game["players"]:
-        return
-
-    if uid in game["submitted"]:
-
-        return await message.reply(
-            "⛔ قبلاً GIF ارسال کردی"
-        )
-
-    game["submitted"].add(uid)
-
-    game["gifs"][uid] = (
-        message.document.file_id
+    await submit_media(
+        message,
+        message.photo[-1].file_id,
+        "photo"
     )
 
-    await message.reply(
-        "✅ GIF ثبت شد"
+
+# =========================
+# STICKER
+# =========================
+
+@dp.message(F.sticker)
+async def sticker_handler(message: Message):
+
+    await submit_media(
+        message,
+        message.sticker.file_id,
+        "sticker"
     )
 
 
@@ -710,32 +840,7 @@ async def vote_handler(
     await call.answer(
         "✅ رأی ثبت شد"
     )
-
-
-# =========================
-# AUTO FINISH VOTE
-# =========================
-
-async def auto_finish_vote(
-    chat_id
-):
-
-    await asyncio.sleep(
-        120
-    )
-
-    game = get_game(
-        chat_id
-    )
-
-    if game["voting"]:
-
-        await finish_round(
-            chat_id
-        )
-
-
-# =========================
+    # =========================
 # FINISH ROUND
 # =========================
 
@@ -747,6 +852,7 @@ async def finish_round(chat_id):
         return
 
     game["voting"] = False
+    game["submit_open"] = False
 
     vote_count = {}
 
@@ -801,7 +907,7 @@ async def finish_round(chat_id):
 
     game["submitted"] = set()
 
-    game["gifs"] = {}
+    game["media"] = {}
 
     game["votes"] = {}
 
@@ -821,6 +927,14 @@ async def finish_round(chat_id):
 
     game["current_scenario"] = scenario
 
+    game["submit_open"] = True
+
+    asyncio.create_task(
+        auto_finish_submit(
+            chat_id
+        )
+    )
+
     await bot.send_message(
 
         chat_id,
@@ -829,7 +943,9 @@ async def finish_round(chat_id):
 
         f"😂 {scenario}\n\n"
 
-        f"🎞 هر بازیکن یک GIF ارسال کند"
+        f"📤 GIF / عکس / استیکر ارسال کنید\n"
+
+        f"⏰ فقط {SUBMIT_TIME} ثانیه فرصت دارید"
     )
 
 
@@ -913,12 +1029,7 @@ async def end_game_internal(
 async def unknown(
     message: Message
 ):
-
-    await message.answer(
-        "❓ دستور نامعتبر\n\n"
-        "📖 راهنما:\n"
-        "/help"
-    )
+    pass
 
 
 # =========================
