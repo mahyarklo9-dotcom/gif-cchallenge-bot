@@ -3,16 +3,17 @@ from aiogram.types import (
     Message,
     CallbackQuery,
     InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    InputMediaPhoto,
-    InputMediaAnimation
+    InlineKeyboardButton
 )
 from aiogram.filters import Command
-from aiogram import BaseMiddleware
 
 import asyncio
 import os
 import random
+
+# =========================
+# BOT
+# =========================
 
 TOKEN = os.getenv("TOKEN")
 
@@ -32,18 +33,6 @@ SUBMIT_TIME = 45
 VOTE_TIME = 30
 
 BOT_OFF = False
-def bot_disabled():
-    return BOT_OFF
-# =========================
-# MIDDLEWARE
-# =========================
-
-
-# =========================
-# GAME STORAGE
-# =========================
-
-games = {}
 
 # =========================
 # SCENARIOS
@@ -111,58 +100,67 @@ SCENARIOS = [
     "وقتی می‌بینی چیزی که دنبالش بودی، دقیقاً جلوی چشمت بوده!",
     "وقتی می‌خواهی جدی باشی ولی یک اتفاق بی‌ربط کل فضا را منفجر می‌کند!"
 ]
+
 # =========================
-# HELPERS
+# GAME STORAGE
+# =========================
+
+games = {}
+
+# =========================
+# GAME TEMPLATE
+# =========================
+
+def create_game():
+
+    return {
+        "started": False,
+        "host": None,
+        "players": {},
+        "scores": {},
+        "round": 0,
+        "scenario": None,
+        "used": [],
+        "submit_open": False,
+        "vote_open": False,
+        "submitted": set(),
+        "entries": {},
+        "votes": {},
+        "vote_count": {}
+    }
+
+# =========================
+# GET GAME
 # =========================
 
 def get_game(chat_id):
 
     if chat_id not in games:
-
-        games[chat_id] = {
-
-            "started": False,
-
-            "host": None,
-
-            "players": {},
-
-            "scores": {},
-
-            "round": 0,
-
-            "scenario": None,
-
-            "used": [],
-
-            "submit_open": False,
-
-            "vote_open": False,
-
-            "submitted": set(),
-
-            "entries": {},
-
-            "votes": {},
-
-            "vote_count": {},
-
-            "message_map": {},
-
-            "tasks": []
-        }
+        games[chat_id] = create_game()
 
     return games[chat_id]
 
+# =========================
+# BOT STATE
+# =========================
+
+def bot_disabled():
+
+    return BOT_OFF
+
+# =========================
+# SCENARIO PICKER
+# =========================
 
 def new_scenario(game):
 
     available = [
-        x for x in SCENARIOS
-        if x not in game["used"]
+        s for s in SCENARIOS
+        if s not in game["used"]
     ]
 
     if not available:
+
         game["used"] = []
         available = SCENARIOS.copy()
 
@@ -172,38 +170,20 @@ def new_scenario(game):
 
     return scenario
 
+# =========================
+# RESET ROUND
+# =========================
 
-async def safe_send(chat_id, text):
+def reset_round(game):
 
-    global BOT_OFF
+    game["submitted"] = set()
+    game["entries"] = {}
+    game["votes"] = {}
+    game["vote_count"] = {}
+    game["submit_open"] = False
+    game["vote_open"] = False
 
-    if BOT_OFF:
-        return
-
-    await bot.send_message(chat_id, text)
-
-
-def build_vote_keyboard(game):
-
-    buttons = []
-
-    for uid, name in game["players"].items():
-
-        if uid in game["entries"]:
-
-            buttons.append(
-                [
-                    InlineKeyboardButton(
-                        text=f"🎯 {name}",
-                        callback_data=f"vote:{uid}"
-                    )
-                ]
-            )
-
-    return InlineKeyboardMarkup(
-        inline_keyboard=buttons
-    )
-    # =========================
+# =========================
 # BASIC COMMANDS
 # =========================
 
@@ -211,35 +191,27 @@ def build_vote_keyboard(game):
 async def start(message: Message):
 
     await message.answer(
-        "🤖 ربات مسابقه میم فعال است.\n\n"
+        "🤖 ربات مسابقه میم آماده است.\n\n"
         "/helpp"
     )
-
 
 @dp.message(Command("helpp"))
 async def helpp(message: Message):
 
-    text = (
-        "📌 دستورات بازی:\n\n"
-        "/newgame ساخت بازی\n"
-        "/join ورود به بازی\n"
-        "/startgame شروع مسابقه\n"
-        "/scoreboard امتیازات\n\n"
+    await message.answer(
+        "📌 دستورات:\n\n"
+        "/newgame\n"
+        "/join\n"
+        "/startgame\n"
+        "/scoreboard\n"
+        "/stopgame\n\n"
         "⚙️ مدیریت:\n"
-        "/die خاموش کردن ربات\n"
-        "/live روشن کردن ربات\n\n"
-        "🎮 روند بازی:\n"
-        "در هر راند یک سناریو نمایش داده می‌شود.\n"
-        "بازیکنان 45 ثانیه فرصت دارند عکس، استیکر یا GIF ارسال کنند.\n"
-        "سپس رأی‌گیری آغاز می‌شود.\n"
-        "بعد از 15 راند برنده مشخص خواهد شد."
+        "/die\n"
+        "/live"
     )
 
-    await message.answer(text)
-
-
 # =========================
-# DIE
+# POWER COMMANDS
 # =========================
 
 @dp.message(Command("die"))
@@ -249,8 +221,9 @@ async def die(message: Message):
 
     BOT_OFF = True
 
-    await message.answer("🔴 ربات خاموش شد")
-
+    await message.answer(
+        "🔴 ربات خاموش شد"
+    )
 
 @dp.message(Command("live"))
 async def live(message: Message):
@@ -259,44 +232,30 @@ async def live(message: Message):
 
     BOT_OFF = False
 
-    await message.answer("🟢 ربات فعال شد")
-# =========================
+    await message.answer(
+        "🟢 ربات روشن شد"
+    )
+    # =========================
 # NEW GAME
 # =========================
 
 @dp.message(Command("newgame"))
 async def newgame(message: Message):
-if bot_disabled():
-    return
+
+    if bot_disabled():
+        return
+
     chat_id = message.chat.id
 
-    game = get_game(chat_id)
+    games[chat_id] = create_game()
 
-    game["started"] = False
-
-    game["round"] = 0
-
-    game["scenario"] = None
-
-    game["submit_open"] = False
-
-    game["vote_open"] = False
-
-    game["submitted"] = set()
-
-    game["entries"] = {}
-
-    game["votes"] = {}
-
-    game["vote_count"] = {}
-
-    game["message_map"] = {}
+    game = games[chat_id]
 
     game["host"] = message.from_user.id
 
     game["players"] = {
         message.from_user.id:
-            message.from_user.first_name
+        message.from_user.first_name
     }
 
     game["scores"] = {
@@ -308,30 +267,33 @@ if bot_disabled():
         "بازیکنان با /join وارد شوند."
     )
 
-
 # =========================
 # JOIN
 # =========================
 
 @dp.message(Command("join"))
 async def join(message: Message):
-if bot_disabled():
-    return
-    game = get_game(message.chat.id)
 
-    uid = message.from_user.id
+    if bot_disabled():
+        return
+
+    game = get_game(message.chat.id)
 
     if game["host"] is None:
 
-        return await message.answer(
+        await message.answer(
             "❌ ابتدا /newgame اجرا شود."
         )
+        return
+
+    uid = message.from_user.id
 
     if uid in game["players"]:
 
-        return await message.answer(
+        await message.answer(
             "⚠️ قبلاً وارد بازی شده‌ای."
         )
+        return
 
     game["players"][uid] = (
         message.from_user.first_name
@@ -343,22 +305,24 @@ if bot_disabled():
         f"✅ {message.from_user.first_name} وارد بازی شد."
     )
 
-
 # =========================
 # SCOREBOARD
 # =========================
 
 @dp.message(Command("scoreboard"))
 async def scoreboard(message: Message):
-if bot_disabled():
-    return
+
+    if bot_disabled():
+        return
+
     game = get_game(message.chat.id)
 
     if not game["players"]:
 
-        return await message.answer(
-            "❌ هنوز بازی‌ای ساخته نشده."
+        await message.answer(
+            "❌ هنوز بازی ساخته نشده."
         )
+        return
 
     ranking = sorted(
         game["scores"].items(),
@@ -368,71 +332,64 @@ if bot_disabled():
 
     text = "🏆 جدول امتیازات\n\n"
 
-    pos = 1
+    place = 1
 
     for uid, score in ranking:
 
         text += (
-            f"{pos}. "
+            f"{place}. "
             f"{game['players'][uid]}"
             f" ➜ {score}\n"
         )
 
-        pos += 1
+        place += 1
 
     await message.answer(text)
 
-
 # =========================
-# RESET ROUND
-# =========================
-
-def reset_round(game):
-
-    game["submitted"] = set()
-
-    game["entries"] = {}
-
-    game["votes"] = {}
-
-    game["vote_count"] = {}
-
-    game["message_map"] = {}
-
-    game["submit_open"] = False
-
-    game["vote_open"] = False
-    # =========================
 # START GAME
 # =========================
 
 @dp.message(Command("startgame"))
 async def startgame(message: Message):
-if bot_disabled():
-    return
+
+    if bot_disabled():
+        return
+
     game = get_game(message.chat.id)
 
     if game["host"] is None:
-        return await message.answer(
+
+        await message.answer(
             "❌ ابتدا /newgame اجرا شود."
         )
+        return
 
     if len(game["players"]) < 2:
-        return await message.answer(
+
+        await message.answer(
             "❌ حداقل ۲ بازیکن لازم است."
         )
+        return
 
     if game["started"]:
-        return await message.answer(
+
+        await message.answer(
             "⚠️ بازی در حال اجراست."
         )
+        return
 
     game["started"] = True
 
     game["round"] = 1
 
-    await start_round(message.chat.id)
+    await message.answer(
+        "🚀 بازی شروع شد."
+    )
 
+    await start_round(
+        message.chat.id
+    )
 
 # =========================
 # START ROUND
@@ -463,14 +420,15 @@ async def start_round(chat_id):
         submit_timer(chat_id)
     )
 
-
 # =========================
 # SUBMIT TIMER
 # =========================
 
 async def submit_timer(chat_id):
 
-    await asyncio.sleep(SUBMIT_TIME)
+    await asyncio.sleep(
+        SUBMIT_TIME
+    )
 
     game = get_game(chat_id)
 
@@ -487,7 +445,7 @@ async def submit_timer(chat_id):
         "⌛ زمان ارسال آثار تمام شد."
     )
 
-    if len(game["entries"]) < 1:
+    if len(game["entries"]) == 0:
 
         await bot.send_message(
             chat_id,
@@ -499,16 +457,16 @@ async def submit_timer(chat_id):
         return
 
     await start_vote(chat_id)
-
-
-# =========================
+    # =========================
 # PHOTO SUBMISSION
 # =========================
 
 @dp.message(F.photo)
 async def receive_photo(message: Message):
-if bot_disabled():
-    return
+
+    if bot_disabled():
+        return
+
     game = get_game(message.chat.id)
 
     if not game["started"]:
@@ -524,9 +482,10 @@ if bot_disabled():
 
     if uid in game["submitted"]:
 
-        return await message.reply(
+        await message.reply(
             "⚠️ در این راند قبلاً اثر فرستاده‌ای."
         )
+        return
 
     file_id = message.photo[-1].file_id
 
@@ -541,15 +500,16 @@ if bot_disabled():
         "✅ عکس ثبت شد."
     )
 
-
 # =========================
 # STICKER SUBMISSION
 # =========================
 
 @dp.message(F.sticker)
 async def receive_sticker(message: Message):
-if bot_disabled():
-    return
+
+    if bot_disabled():
+        return
+
     game = get_game(message.chat.id)
 
     if not game["started"]:
@@ -565,9 +525,10 @@ if bot_disabled():
 
     if uid in game["submitted"]:
 
-        return await message.reply(
+        await message.reply(
             "⚠️ در این راند قبلاً اثر فرستاده‌ای."
         )
+        return
 
     game["submitted"].add(uid)
 
@@ -580,15 +541,16 @@ if bot_disabled():
         "✅ استیکر ثبت شد."
     )
 
-
 # =========================
 # GIF SUBMISSION
 # =========================
 
 @dp.message(F.animation)
 async def receive_animation(message: Message):
-if bot_disabled():
-    return
+
+    if bot_disabled():
+        return
+
     game = get_game(message.chat.id)
 
     if not game["started"]:
@@ -604,9 +566,10 @@ if bot_disabled():
 
     if uid in game["submitted"]:
 
-        return await message.reply(
+        await message.reply(
             "⚠️ در این راند قبلاً اثر فرستاده‌ای."
         )
+        return
 
     game["submitted"].add(uid)
 
@@ -619,13 +582,15 @@ if bot_disabled():
         "✅ GIF ثبت شد."
     )
 
-
 # =========================
-# UNSUPPORTED MEDIA
+# INVALID MEDIA
 # =========================
 
 @dp.message()
 async def catch_other_messages(message: Message):
+
+    if bot_disabled():
+        return
 
     game = get_game(message.chat.id)
 
@@ -644,12 +609,11 @@ async def catch_other_messages(message: Message):
         "📌 فقط عکس، استیکر یا GIF مجاز است."
     )
     # =========================
-# START VOTING
+# START VOTE
 # =========================
 
 async def start_vote(chat_id):
-if bot_disabled():
-    return
+
     game = get_game(chat_id)
 
     game["vote_open"] = True
@@ -661,8 +625,6 @@ if bot_disabled():
     )
 
     index = 1
-
-    game["message_map"] = {}
 
     for uid, media in game["entries"].items():
 
@@ -679,16 +641,13 @@ if bot_disabled():
             ]
         )
 
-        owner = game["players"][uid]
-
         caption = (
-            f"🎭 اثر شماره {index}\n"
-            f"👤 ارسال‌کننده: {owner}"
+            f"🎭 اثر شماره {index}"
         )
 
         if media["type"] == "photo":
 
-            msg = await bot.send_photo(
+            await bot.send_photo(
                 chat_id,
                 media["file_id"],
                 caption=caption,
@@ -697,7 +656,7 @@ if bot_disabled():
 
         elif media["type"] == "animation":
 
-            msg = await bot.send_animation(
+            await bot.send_animation(
                 chat_id,
                 media["file_id"],
                 caption=caption,
@@ -711,13 +670,11 @@ if bot_disabled():
                 media["file_id"]
             )
 
-            msg = await bot.send_message(
+            await bot.send_message(
                 chat_id,
                 caption,
                 reply_markup=keyboard
             )
-
-        game["message_map"][msg.message_id] = uid
 
         index += 1
 
@@ -725,31 +682,34 @@ if bot_disabled():
         vote_timer(chat_id)
     )
 
-
 # =========================
-# VOTE BUTTON
+# VOTE HANDLER
 # =========================
 
 @dp.callback_query(F.data.startswith("vote:"))
 async def vote_handler(callback: CallbackQuery):
 
-    game = get_game(callback.message.chat.id)
+    game = get_game(
+        callback.message.chat.id
+    )
 
     if not game["vote_open"]:
 
-        return await callback.answer(
+        await callback.answer(
             "⛔ رأی‌گیری بسته شده است.",
             show_alert=True
         )
+        return
 
     voter = callback.from_user.id
 
     if voter not in game["players"]:
 
-        return await callback.answer(
+        await callback.answer(
             "⛔ عضو بازی نیستی.",
             show_alert=True
         )
+        return
 
     target = int(
         callback.data.split(":")[1]
@@ -757,10 +717,11 @@ async def vote_handler(callback: CallbackQuery):
 
     if voter == target:
 
-        return await callback.answer(
+        await callback.answer(
             "❌ نمی‌توانی به خودت رأی بدهی.",
             show_alert=True
         )
+        return
 
     if voter in game["votes"]:
 
@@ -775,7 +736,6 @@ async def vote_handler(callback: CallbackQuery):
     await callback.answer(
         "✅ رأی ثبت شد."
     )
-
 
 # =========================
 # VOTE TIMER
@@ -826,7 +786,8 @@ async def calculate_round(chat_id):
         result_text += (
             f"👤 {game['players'][uid]}\n"
             f"🗳 رأی: {votes}\n"
-            f"🏆 امتیاز کل: {game['scores'][uid]}\n\n"
+            f"🏆 امتیاز کل: "
+            f"{game['scores'][uid]}\n\n"
         )
 
     await bot.send_message(
@@ -835,10 +796,6 @@ async def calculate_round(chat_id):
     )
 
     await show_scoreboard(chat_id)
-
-    # =====================
-    # NEXT ROUND ?
-    # =====================
 
     if game["round"] >= MAX_ROUNDS:
 
@@ -856,9 +813,8 @@ async def calculate_round(chat_id):
 
     await start_round(chat_id)
 
-
 # =========================
-# SHOW SCOREBOARD
+# SCOREBOARD
 # =========================
 
 async def show_scoreboard(chat_id):
@@ -889,9 +845,7 @@ async def show_scoreboard(chat_id):
         chat_id,
         text
     )
-
-
-# =========================
+    # =========================
 # FINISH GAME
 # =========================
 
@@ -904,6 +858,11 @@ async def finish_game(chat_id):
         key=lambda x: x[1],
         reverse=True
     )
+
+    if not ranking:
+
+        games[chat_id] = create_game()
+        return
 
     winner_id = ranking[0][0]
     winner_score = ranking[0][1]
@@ -933,44 +892,26 @@ async def finish_game(chat_id):
         text
     )
 
-    # =====================
-    # RESET GAME
-    # =====================
-
-    games[chat_id] = {
-        "started": False,
-        "host": None,
-        "players": {},
-        "scores": {},
-        "round": 0,
-        "scenario": None,
-        "used": [],
-        "submit_open": False,
-        "vote_open": False,
-        "submitted": set(),
-        "entries": {},
-        "votes": {},
-        "vote_count": {},
-        "message_map": {},
-        "tasks": []
-    }
-
+    games[chat_id] = create_game()
 
 # =========================
-# FORCE STOP GAME
+# STOP GAME
 # =========================
 
 @dp.message(Command("stopgame"))
 async def stopgame(message: Message):
-if bot_disabled():
-    return
+
+    if bot_disabled():
+        return
+
     game = get_game(message.chat.id)
 
     if not game["started"]:
 
-        return await message.answer(
+        await message.answer(
             "❌ بازی فعالی وجود ندارد."
         )
+        return
 
     await bot.send_message(
         message.chat.id,
@@ -981,7 +922,6 @@ if bot_disabled():
         message.chat.id
     )
 
-
 # =========================
 # MAIN
 # =========================
@@ -991,7 +931,6 @@ async def main():
     print("BOT STARTED")
 
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
 
