@@ -1,13 +1,7 @@
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import (
-    Message,
-    CallbackQuery,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton
-)
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 from aiogram import BaseMiddleware
-
 import asyncio
 import os
 import random
@@ -27,7 +21,7 @@ VOTE_TIME = 30
 BOT_DISABLED = False
 
 # =========================
-# MIDDLEWARE (FIXED)
+# FIXED MIDDLEWARE
 # =========================
 
 class DisableMiddleware(BaseMiddleware):
@@ -38,11 +32,13 @@ class DisableMiddleware(BaseMiddleware):
 
         if BOT_DISABLED:
 
-            # فقط /live اجازه دارد
             if isinstance(event, Message):
-                if event.text != "/live":
+                text = event.text or ""
+
+                if text != "/live":
                     return
-            else:
+
+            elif isinstance(event, CallbackQuery):
                 return
 
         return await handler(event, data)
@@ -120,6 +116,8 @@ SCENARIOS = [
     "وقتی می‌بینی چیزی که دنبالش بودی، دقیقاً جلوی چشمت بوده!",
     "وقتی می‌خواهی جدی باشی ولی یک اتفاق بی‌ربط کل فضا را منفجر می‌کند!"
 ]
+
+
 def get_game(chat_id):
 
     if chat_id not in games:
@@ -155,86 +153,67 @@ def new_scenario(game):
 
 
 # =========================
-# HELP
+# START (FIXED)
+# =========================
+
+@dp.message(Command("start"))
+async def start(message: Message):
+
+    await message.answer(
+        "🤖 ربات فعال شد!\n\n"
+        "🎮 برای ساخت بازی:\n/newgame\n\n"
+        "📖 برای راهنما:\n/helpp"
+    )
+
+
+# =========================
+# HELPP (IMPROVED)
 # =========================
 
 @dp.message(Command("helpp"))
 async def helpp(message: Message):
 
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="🎮 بازی", callback_data="help_game"),
-                InlineKeyboardButton(text="⚙️ مدیریت", callback_data="help_admin")
-            ],
-            [
-                InlineKeyboardButton(text="📌 قوانین", callback_data="help_rules")
-            ]
-        ]
-    )
-
     await message.answer(
-        "🎮 GIF Challenge\nیکی را انتخاب کن:",
-        reply_markup=keyboard
+        "📖 راهنمای ربات:\n\n"
+        "🎮 /newgame - ساخت بازی\n"
+        "👥 /join - ورود به بازی\n"
+        "🚀 /startgame - شروع بازی\n"
+        "🏆 /scoreboard - امتیازات\n\n"
+        "⚙️ /die - خاموش کردن ربات\n"
+        "🟢 /live - روشن کردن ربات"
     )
-
-
-@dp.callback_query(F.data == "help_game")
-async def help_game(call: CallbackQuery):
-
-    await call.message.answer(
-        "/newgame\n/join\n/startgame\n/players\n/scoreboard"
-    )
-    await call.answer()
-
-
-@dp.callback_query(F.data == "help_admin")
-async def help_admin(call: CallbackQuery):
-
-    await call.message.answer(
-        "/endvote\n/end_game\n/die\n/live"
-    )
-    await call.answer()
-
-
-@dp.callback_query(F.data == "help_rules")
-async def help_rules(call: CallbackQuery):
-
-    await call.message.answer(
-        "15 rounds\n45s send\n30s vote\nGIF/photo/sticker"
-    )
-    await call.answer()
 
 
 # =========================
-# DIE / LIVE
+# DIE / LIVE (FIXED FEEDBACK)
 # =========================
 
 @dp.message(Command("die"))
 async def die(message: Message):
+
     global BOT_DISABLED
     BOT_DISABLED = True
-    await message.answer("💀 OFF")
+
+    await message.answer(
+        "💀 ربات خاموش شد\n\n"
+        "⛔ هیچ بازی یا دستوری اجرا نمی‌شود"
+    )
 
 
 @dp.message(Command("live"))
 async def live(message: Message):
+
     global BOT_DISABLED
     BOT_DISABLED = False
-    await message.answer("🟢 ON")
+
+    await message.answer(
+        "🟢 ربات فعال شد\n\n"
+        "✅ همه دستورات دوباره کار می‌کنند"
+    )
 
 
 # =========================
-# START
-# =========================
-
-@dp.message(Command("start"))
-async def start(message: Message):
-    await message.answer("Bot Ready\n/helpp")
-
-
-# =========================
-# NEW GAME
+# NEW GAME (FIXED RESPONSE)
 # =========================
 
 @dp.message(Command("newgame"))
@@ -248,7 +227,11 @@ async def newgame(message: Message):
     game["players"] = {host: message.from_user.first_name}
     game["scores"] = {host: 0}
 
-    await message.answer("Game created")
+    await message.answer(
+        "🎮 بازی جدید ساخته شد!\n\n"
+        "👑 Host اضافه شد\n"
+        "👥 حالا دیگران /join بزنند"
+    )
 
 
 # =========================
@@ -263,12 +246,12 @@ async def join(message: Message):
     uid = message.from_user.id
 
     if uid in game["players"]:
-        return
+        return await message.answer("⚠️ شما قبلاً وارد بازی شدید")
 
     game["players"][uid] = message.from_user.first_name
     game["scores"][uid] = 0
 
-    await message.answer("Joined")
+    await message.answer("✅ شما وارد بازی شدید!")
 
 
 # =========================
@@ -281,7 +264,7 @@ async def startgame(message: Message):
     game = get_game(message.chat.id)
 
     if len(game["players"]) < 2:
-        return await message.answer("Need 2 players")
+        return await message.answer("❌ حداقل ۲ بازیکن لازم است")
 
     game["started"] = True
     game["round"] = 1
@@ -290,25 +273,11 @@ async def startgame(message: Message):
     game["scenario"] = new_scenario(game)
 
     await message.answer(
-        f"Round 1\n\n{game['scenario']}"
+        f"🚀 بازی شروع شد!\n\n"
+        f"🎯 راند 1\n"
+        f"😂 {game['scenario']}\n\n"
+        f"⏳ ۴۵ ثانیه فرصت دارید"
     )
-
-
-# =========================
-# PLAYERS
-# =========================
-
-@dp.message(Command("players"))
-async def players(message: Message):
-
-    game = get_game(message.chat.id)
-
-    text = "Players:\n"
-
-    for p in game["players"].values():
-        text += f"- {p}\n"
-
-    await message.answer(text)
 
 
 # =========================
@@ -320,16 +289,17 @@ async def scoreboard(message: Message):
 
     game = get_game(message.chat.id)
 
-    text = "Score:\n"
+    text = "🏆 امتیازات:\n\n"
 
     for uid, score in game["scores"].items():
-        text += f"{game['players'][uid]}: {score}\n"
+        name = game["players"][uid]
+        text += f"{name}: {score}\n"
 
     await message.answer(text)
 
 
 # =========================
-# RUN
+# RUN BOT
 # =========================
 
 async def main():
