@@ -32,40 +32,12 @@ SUBMIT_TIME = 45
 VOTE_TIME = 30
 
 BOT_OFF = False
-
+def bot_disabled():
+    return BOT_OFF
 # =========================
 # MIDDLEWARE
 # =========================
 
-class GateMiddleware(BaseMiddleware):
-
-async def __call__(self, handler, event, data):
-
-    global BOT_OFF
-
-    # وقتی ربات روشن است
-    if not BOT_OFF:
-        return await handler(event, data)
-
-    # وقتی ربات خاموش است
-    if isinstance(event, Message):
-
-        text = event.text or ""
-
-        # فقط دستور /live اجازه عبور دارد
-        if text.startswith("/live"):
-            return await handler(event, data)
-
-        return
-
-    # همه Callback ها مسدود شوند
-    if isinstance(event, CallbackQuery):
-        return
-
-    return
-
-dp.message.middleware(GateMiddleware())
-dp.callback_query.middleware(GateMiddleware())
 
 # =========================
 # GAME STORAGE
@@ -277,14 +249,8 @@ async def die(message: Message):
 
     BOT_OFF = True
 
-    await message.answer(
-        "🔴 ربات خاموش شد"
-    )
+    await message.answer("🔴 ربات خاموش شد")
 
-
-# =========================
-# LIVE
-# =========================
 
 @dp.message(Command("live"))
 async def live(message: Message):
@@ -293,18 +259,15 @@ async def live(message: Message):
 
     BOT_OFF = False
 
-    await message.answer(
-        "🟢 ربات فعال شد"
-    )
-
-
+    await message.answer("🟢 ربات فعال شد")
 # =========================
 # NEW GAME
 # =========================
 
 @dp.message(Command("newgame"))
 async def newgame(message: Message):
-
+if bot_disabled():
+    return
     chat_id = message.chat.id
 
     game = get_game(chat_id)
@@ -352,7 +315,8 @@ async def newgame(message: Message):
 
 @dp.message(Command("join"))
 async def join(message: Message):
-
+if bot_disabled():
+    return
     game = get_game(message.chat.id)
 
     uid = message.from_user.id
@@ -386,7 +350,8 @@ async def join(message: Message):
 
 @dp.message(Command("scoreboard"))
 async def scoreboard(message: Message):
-
+if bot_disabled():
+    return
     game = get_game(message.chat.id)
 
     if not game["players"]:
@@ -443,7 +408,8 @@ def reset_round(game):
 
 @dp.message(Command("startgame"))
 async def startgame(message: Message):
-
+if bot_disabled():
+    return
     game = get_game(message.chat.id)
 
     if game["host"] is None:
@@ -541,7 +507,8 @@ async def submit_timer(chat_id):
 
 @dp.message(F.photo)
 async def receive_photo(message: Message):
-
+if bot_disabled():
+    return
     game = get_game(message.chat.id)
 
     if not game["started"]:
@@ -581,7 +548,8 @@ async def receive_photo(message: Message):
 
 @dp.message(F.sticker)
 async def receive_sticker(message: Message):
-
+if bot_disabled():
+    return
     game = get_game(message.chat.id)
 
     if not game["started"]:
@@ -619,7 +587,8 @@ async def receive_sticker(message: Message):
 
 @dp.message(F.animation)
 async def receive_animation(message: Message):
-
+if bot_disabled():
+    return
     game = get_game(message.chat.id)
 
     if not game["started"]:
@@ -679,7 +648,8 @@ async def catch_other_messages(message: Message):
 # =========================
 
 async def start_vote(chat_id):
-
+if bot_disabled():
+    return
     game = get_game(chat_id)
 
     game["vote_open"] = True
@@ -992,7 +962,8 @@ async def finish_game(chat_id):
 
 @dp.message(Command("stopgame"))
 async def stopgame(message: Message):
-
+if bot_disabled():
+    return
     game = get_game(message.chat.id)
 
     if not game["started"]:
