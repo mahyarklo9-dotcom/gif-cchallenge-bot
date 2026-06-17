@@ -39,20 +39,30 @@ BOT_OFF = False
 
 class GateMiddleware(BaseMiddleware):
 
-    async def __call__(self, handler, event, data):
+async def __call__(self, handler, event, data):
 
-        global BOT_OFF
+    global BOT_OFF
 
-        if BOT_OFF:
-
-            if isinstance(event, Message):
-                if event.text != "/live":
-                    return
-
-            elif isinstance(event, CallbackQuery):
-                return
-
+    # وقتی ربات روشن است
+    if not BOT_OFF:
         return await handler(event, data)
+
+    # وقتی ربات خاموش است
+    if isinstance(event, Message):
+
+        text = event.text or ""
+
+        # فقط دستور /live اجازه عبور دارد
+        if text.startswith("/live"):
+            return await handler(event, data)
+
+        return
+
+    # همه Callback ها مسدود شوند
+    if isinstance(event, CallbackQuery):
+        return
+
+    return
 
 dp.message.middleware(GateMiddleware())
 dp.callback_query.middleware(GateMiddleware())
