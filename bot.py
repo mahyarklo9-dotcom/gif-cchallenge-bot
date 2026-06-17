@@ -1,7 +1,13 @@
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import (
+    Message,
+    CallbackQuery,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton
+)
 from aiogram.filters import Command
 from aiogram import BaseMiddleware
+
 import asyncio
 import os
 import random
@@ -18,10 +24,35 @@ MAX_ROUNDS = 15
 SUBMIT_TIME = 45
 VOTE_TIME = 30
 
-BOT_DISABLED = False
+# =========================
+# BOT STATES
+# =========================
+
+BOT_DISABLED = False   # خاموش/روشن
+BOT_SILENT = False     # فقط جلوگیری از ارسال پیام
 
 # =========================
-# FIXED MIDDLEWARE
+# SAFE SEND (VERY IMPORTANT)
+# =========================
+
+async def safe_send(message: Message, text: str, **kwargs):
+
+    if BOT_SILENT:
+        return
+
+    return await message.answer(text, **kwargs)
+
+
+async def safe_bot_send(chat_id: int, text: str):
+
+    if BOT_SILENT:
+        return
+
+    return await bot.send_message(chat_id, text)
+
+
+# =========================
+# MIDDLEWARE (only disables interaction when OFF)
 # =========================
 
 class DisableMiddleware(BaseMiddleware):
@@ -34,7 +65,6 @@ class DisableMiddleware(BaseMiddleware):
 
             if isinstance(event, Message):
                 text = event.text or ""
-
                 if text != "/live":
                     return
 
@@ -116,8 +146,6 @@ SCENARIOS = [
     "وقتی می‌بینی چیزی که دنبالش بودی، دقیقاً جلوی چشمت بوده!",
     "وقتی می‌خواهی جدی باشی ولی یک اتفاق بی‌ربط کل فضا را منفجر می‌کند!"
 ]
-
-
 def get_game(chat_id):
 
     if chat_id not in games:
@@ -149,71 +177,73 @@ def new_scenario(game):
 
     s = random.choice(available)
     game["used"].append(s)
+
     return s
 
 
 # =========================
-# START (FIXED)
+# START
 # =========================
 
 @dp.message(Command("start"))
 async def start(message: Message):
 
-    await message.answer(
-        "🤖 ربات فعال شد!\n\n"
-        "🎮 برای ساخت بازی:\n/newgame\n\n"
-        "📖 برای راهنما:\n/helpp"
+    await safe_send(
+        message,
+        "🤖 ربات فعال است!\n\n"
+        "🎮 /newgame برای شروع بازی\n"
+        "📖 /helpp برای راهنما"
     )
 
 
 # =========================
-# HELPP (IMPROVED)
+# HELPP
 # =========================
 
 @dp.message(Command("helpp"))
 async def helpp(message: Message):
 
-    await message.answer(
-        "📖 راهنمای ربات:\n\n"
-        "🎮 /newgame - ساخت بازی\n"
-        "👥 /join - ورود به بازی\n"
-        "🚀 /startgame - شروع بازی\n"
-        "🏆 /scoreboard - امتیازات\n\n"
-        "⚙️ /die - خاموش کردن ربات\n"
-        "🟢 /live - روشن کردن ربات"
+    await safe_send(
+        message,
+        "📌 دستورات:\n\n"
+        "/newgame\n/join\n/startgame\n/scoreboard\n\n"
+        "⚙️ مدیریت:\n/die\n/live"
     )
 
 
 # =========================
-# DIE / LIVE (FIXED FEEDBACK)
+# DIE (SILENT MODE)
 # =========================
 
 @dp.message(Command("die"))
 async def die(message: Message):
 
-    global BOT_DISABLED
+    global BOT_DISABLED, BOT_SILENT
+
     BOT_DISABLED = True
+    BOT_SILENT = True
 
-    await message.answer(
-        "💀 ربات خاموش شد\n\n"
-        "⛔ هیچ بازی یا دستوری اجرا نمی‌شود"
-    )
+    # این پیام فقط اگر سایلنت نباشد ارسال می‌شود
+    await message.answer("🔇 ربات سایلنت شد (دیگر پیام نمی‌دهد)")
 
+
+# =========================
+# LIVE (RESTORE)
+# =========================
 
 @dp.message(Command("live"))
 async def live(message: Message):
 
-    global BOT_DISABLED
-    BOT_DISABLED = False
+    global BOT_DISABLED, BOT_SILENT
 
-    await message.answer(
-        "🟢 ربات فعال شد\n\n"
-        "✅ همه دستورات دوباره کار می‌کنند"
-    )
+    BOT_DISABLED = False
+    BOT_SILENT = False
+
+    await message.answer("🟢 ربات دوباره فعال شد")
 
 
 # =========================
-# NEW GAME (FIXED RESPONSE)
+# NEW GAME
 # =========================
 
 @dp.message(Command("newgame"))
@@ -227,11 +257,7 @@ async def newgame(message: Message):
     game["players"] = {host: message.from_user.first_name}
     game["scores"] = {host: 0}
 
-    await message.answer(
-        "🎮 بازی جدید ساخته شد!\n\n"
-        "👑 Host اضافه شد\n"
-        "👥 حالا دیگران /join بزنند"
-    )
+    await safe_send(message, "🎮 بازی ساخته شد!\n👑 Host اضافه شد")
 
 
 # =========================
@@ -246,12 +272,12 @@ async def join(message: Message):
     uid = message.from_user.id
 
     if uid in game["players"]:
-        return await message.answer("⚠️ شما قبلاً وارد بازی شدید")
+        return await safe_send(message, "⚠️ قبلاً وارد شدی")
 
     game["players"][uid] = message.from_user.first_name
     game["scores"][uid] = 0
 
-    await message.answer("✅ شما وارد بازی شدید!")
+    await safe_send(message, "✅ وارد بازی شدی")
 
 
 # =========================
@@ -264,7 +290,7 @@ async def startgame(message: Message):
     game = get_game(message.chat.id)
 
     if len(game["players"]) < 2:
-        return await message.answer("❌ حداقل ۲ بازیکن لازم است")
+        return await safe_send(message, "❌ حداقل ۲ بازیکن لازم است")
 
     game["started"] = True
     game["round"] = 1
@@ -272,7 +298,8 @@ async def startgame(message: Message):
 
     game["scenario"] = new_scenario(game)
 
-    await message.answer(
+    await safe_send(
+        message,
         f"🚀 بازی شروع شد!\n\n"
         f"🎯 راند 1\n"
         f"😂 {game['scenario']}\n\n"
@@ -292,10 +319,9 @@ async def scoreboard(message: Message):
     text = "🏆 امتیازات:\n\n"
 
     for uid, score in game["scores"].items():
-        name = game["players"][uid]
-        text += f"{name}: {score}\n"
+        text += f"{game['players'][uid]}: {score}\n"
 
-    await message.answer(text)
+    await safe_send(message, text)
 
 
 # =========================
