@@ -6,6 +6,7 @@ from aiogram.types import (
     InlineKeyboardButton
 )
 from aiogram.filters import Command
+
 import asyncio
 import os
 import random
@@ -22,90 +23,67 @@ MAX_ROUNDS = 15
 
 games = {}
 
-SCENARIOS = [
-
-# سناریوهای اصلی
-
-"وقتی ساعت ۳ صبح یادت می‌افتد فردا امتحان داری!",
-"وقتی شارژ گوشی به ۱٪ رسیده!",
-"وقتی اشتباهی پیام را برای رئیست فرستادی!",
-"وقتی مادرت می‌گوید مهمان داریم!",
-"وقتی اینترنت وسط بازی قطع می‌شود!",
-"وقتی دوستت می‌گوید فقط یک سوال کوچیک دارم!",
-"وقتی رمز کارت یادت نمی‌آید!",
-"وقتی متوجه می‌شوی امروز تعطیل نیست!",
-"وقتی غذا را سفارش دادی و اشتباه آوردند!",
-"وقتی از خواب بیدار می‌شوی و فکر می‌کنی دیر شده!",
-"وقتی با اعتماد به نفس وارد اتاق می‌شوی و می‌فهمی اتاق اشتباه بوده!",
-"وقتی جلوی آینه ژست می‌گیری و کسی پشت سرت می‌خندد!",
-"وقتی با عجله می‌دوی ولی می‌بینی در بسته بوده!",
-"وقتی می‌خواهی اسم کسی را صدا بزنی و یادت نمی‌آید!",
-"وقتی می‌گویی من دارم میرم و تازه لباس نپوشیدی!",
-"وقتی با صدای بلند آهنگ می‌خوانی و می‌فهمی هدفونت وصل نبوده!",
-"وقتی روی صندلی می‌نشینی و می‌فهمی از قبل خیس بوده!",
-"وقتی می‌خواهی خیلی شیک حرف بزنی ولی زبانت می‌گیرد!",
-"وقتی به سطل زباله می‌زنی ولی توپ نیست!",
-"وقتی داری از پله‌ها پایین می‌آیی و یک پله کم می‌آوری!",
-"وقتی پیام الان میام را فرستادی و هنوز از تخت بلند نشدی!",
-"وقتی برای کسی دست تکان می‌دهی و می‌فهمی با تو نبوده!",
-"وقتی در آسانسور فقط تویی و یک نفر دیگر!",
-"وقتی می‌خواهی خونسرد باشی ولی لیوان از دستت می‌افتد!",
-"وقتی فکر می‌کنی میکروفون خاموش است ولی روشن بوده!",
-"وقتی وسط صحبت یادت می‌رود داشتی چی می‌گفتی!",
-"وقتی گوشی دستته ولی دنبالش می‌گردی!",
-"وقتی فکر می‌کنی کسی نگات می‌کنه و واقعاً داره نگات می‌کنه!",
-"وقتی می‌خوای خفن باشی ولی زمین می‌خوری!",
-"وقتی پیام رو اشتباهی برای گروه می‌فرستی!",
-"وقتی وسط خنده سرفه می‌کنی!",
-"وقتی می‌خوای سریع جواب بدی ولی اینترنت هنگ می‌کنه!",
-"وقتی فکر می‌کنی زنگ خورد ولی تو ذهنت بوده!",
-"وقتی در بسته‌ست ولی هلش می‌دی!",
-"وقتی می‌خوای آروم در رو ببندی ولی کل خونه می‌لرزه!",
-"وقتی فکر می‌کنی فیلمو دیدی ولی آخرش یادت نیست!",
-"وقتی می‌خوای حرفه‌ای تایپ کنی ولی کیبورد قاطی می‌کنه!",
-"وقتی می‌خوای از در رد شی ولی شیشه‌ایه!",
-"وقتی فکر می‌کنی وای فای قطعه ولی رمز اشتباهه!",
-"وقتی یه جوک می‌گی و خودت بیشتر می‌خندی!",
-"وقتی می‌فهمی کل روز لباس را پشت و رو پوشیده بودی!",
-"وقتی بعد از سلام کردن می‌فهمی طرف را نمی‌شناسی!",
-"وقتی می‌گی من رژیمم و پنج دقیقه بعد پیتزا می‌خوری!",
-"وقتی فکر می‌کنی تنها خونه‌ای ولی یکی از اتاق بیرون میاد!",
-"وقتی معلم میگه داوطلب داریم؟ و چشمت تو چشمش میفته!",
-"وقتی می‌خوای یواشکی بخندی ولی صدات می‌پیچه!",
-"وقتی وارد استخر می‌شی و آب خیلی سردتر از چیزیه که فکر می‌کردی!",
-"وقتی به کسی پیام میدی و بعد می‌بینی یک سال پیش آنلاین بوده!",
-"وقتی می‌خوای شجاع باشی ولی یه سوسک ظاهر میشه!",
-"وقتی می‌فهمی جلسه‌ای که براش آماده شدی فرداست!",
-"وقتی جلوی همه زمین می‌خوری ولی وانمود می‌کنی چیزی نشده!",
-"وقتی فکر می‌کنی دوربین خاموشه!",
-"وقتی تازه فهمیدی امروز دوشنبه است!",
-"وقتی می‌خوای آروم بخوری ولی غذا روی لباست می‌ریزه!",
-"وقتی رمز را درست وارد می‌کنی ولی CAPS LOCK روشنه!",
-"وقتی وسط دعوا اسمت را اشتباه صدا می‌زنند!",
-"وقتی به آینه لبخند می‌زنی و خودت می‌ترسی!",
-"وقتی می‌فهمی پیام صوتی ۵ دقیقه‌ای اشتباه ارسال شده!",
-"وقتی می‌خوای زرنگ باشی ولی لو میری!",
-"وقتی می‌فهمی کل مدت هندزفری وصل نبوده!",
-"وقتی وارد کلاس اشتباه می‌شی!",
-"وقتی بیدار می‌شی و نمی‌دونی صبحه یا شبه!",
-"وقتی از کسی تعریف می‌کنی و پشت سرت ایستاده!",
-"وقتی می‌گی فقط یک قسمت سریال!",
-"وقتی به در می‌کوبی و خودت می‌ترسی!",
-"وقتی دنبال عینکت می‌گردی و روی چشمت بوده!",
-"وقتی یخچال را باز می‌کنی و یادت میره چی می‌خواستی!",
-"وقتی با اطمینان جواب میدی و اشتباهه!",
-"وقتی می‌خوای عکس جدی بگیری ولی خنده‌ات می‌گیره!",
-"وقتی می‌خوای فرار کنی ولی راه خروج اشتباهه!",
-"وقتی می‌گی فقط پنج دقیقه می‌خوابم!",
-"وقتی صدای خودتو توی ویس می‌شنوی!",
-"وقتی برای اولین بار غذای خودت رو می‌پزی!",
-"وقتی می‌خوای کمک کنی ولی اوضاع بدتر میشه!",
-"وقتی از چیزی می‌ترسی که وجود نداره!",
-"وقتی می‌خوای مخفی بشی ولی همه می‌بیننت!",
-"وقتی از پشت شیشه به کسی سلام می‌کنی!",
-"وقتی می‌فهمی شارژرت را جا گذاشتی!",
-"وقتی وارد مغازه می‌شی و چیزی نمی‌خری!",
-"وقتی می‌گی من کنترل اوضاع را دارم!"
+SCENARIOS =[
+    "وقتی ساعت ۳ صبح یادت می‌افتد فردا امتحان داری!",
+    "وقتی شارژ گوشی به ۱٪ رسیده!",
+    "وقتی اشتباهی پیام را برای رئیست فرستادی!",
+    "وقتی مادرت می‌گوید مهمان داریم!",
+    "وقتی اینترنت وسط بازی قطع می‌شود!",
+    "وقتی دوستت می‌گوید فقط یک سوال کوچیک دارم!",
+    "وقتی رمز کارت یادت نمی‌آید!",
+    "وقتی متوجه می‌شوی امروز تعطیل نیست!",
+    "وقتی غذا را سفارش دادی و اشتباه آوردند!",
+    "وقتی از خواب بیدار می‌شوی و فکر می‌کنی دیر شده!",
+    "وقتی با اعتماد به نفس وارد اتاق می‌شوی و می‌فهمی اتاق اشتباه بوده!",
+    "وقتی جلوی آینه ژست می‌گیری و کسی پشت سرت می‌خندد!",
+    "وقتی با عجله می‌دوی ولی می‌بینی در بسته بوده!",
+    "وقتی می‌خواهی اسم کسی را صدا بزنی و یادت نمی‌آید!",
+    "وقتی می‌گویی «من دارم می‌رم» و تازه لباس نپوشیدی!",
+    "وقتی با صدای بلند آهنگ می‌خوانی و می‌فهمی هدفونت وصل نبوده!",
+    "وقتی روی صندلی می‌نشینی و می‌فهمی از قبل خیس بوده!",
+    "وقتی می‌خواهی خیلی شیک حرف بزنی ولی زبانت می‌گیرد!",
+    "وقتی به سطل زباله می‌زنی ولی توپ نیست، مچاله کاغذه!",
+    "وقتی داری از پله‌ها پایین می‌آیی و یک پله کم می‌آوری!",
+    "وقتی پیام «الان میام» را فرستادی و هنوز از تخت بلند نشدی!",
+    "وقتی برای کسی دست تکان می‌دهی و می‌فهمی با تو نبوده!",
+    "وقتی در آسانسور فقط تویی و یک نفر دیگر و هر دو به دیوار نگاه می‌کنید!",
+    "وقتی می‌خواهی خونسرد باشی ولی لیوان از دستت لیز می‌خورد!",
+    "وقتی می‌فهمی کلاهت را ۳ ساعت روی سرت گذاشته بودی ولی برعکس!",
+    "وقتی با اعتماد می‌گویی «این که کاری نداره» و بعد گیر می‌کنی!",
+    "وقتی در جمع می‌خندی و بعد می‌پرسی «ببخشید به چی می‌خندید؟»!",
+    "وقتی نان تست از دستت می‌افتد و دقیقاً سمت کره‌ای می‌خورد!",
+    "وقتی می‌خواهی بی‌صدا وارد خانه شوی و در جیرجیر می‌کند!",
+    "وقتی اسمت را صدا می‌زنند و تو از جایت می‌پری ولی منظورشان یکی دیگر بوده!",
+    "وقتی خودت را جمع‌وجور می‌کنی که فوتبالیست‌طور توپ بزنی و می‌خوری زمین!",
+    "وقتی برای عکس گرفتن آماده می‌شوی ولی دوربین بسته شده!",
+    "وقتی گوشی را برداشتی تا ساعت را نگاه کنی و یادت می‌رود!",
+    "وقتی می‌گویی «الان دقیق می‌دونم کجاست» و پنج دقیقه بعد هیچ‌چیز پیدا نمی‌کنی!",
+    "وقتی به موهایت ژل زدی ولی باد از همه قوی‌تر است!",
+    "وقتی توی صف می‌ایستی و می‌فهمی اصلاً صف مال تو نبوده!",
+    "وقتی می‌خواهی از یک گفت‌وگوی خجالت‌آور فرار کنی و کسی صدایت می‌کند!",
+    "وقتی وسط صحبت ناگهان یادت می‌رود داشتی چه می‌گفتی!",
+    "وقتی چشم‌هایت را می‌بندی که نخوابی، ولی دقیقاً خوابت می‌برد!",
+    "وقتی می‌خواهی چیزی را سریع بخوری و زبانت می‌سوزد!",
+    "وقتی لباس جدید می‌پوشی و همان روز باران می‌آید!",
+    "وقتی می‌خواهی خیلی جدی باشی ولی یک خنده ناگهانی همه‌چیز را خراب می‌کند!",
+    "وقتی موقع سلام دادن، هم‌زمان می‌روی برای دست دادن و بغل!",
+    "وقتی با شور و شوق وارد آشپزخانه می‌شوی و یادت می‌آید برای غذا نیامده بودی!",
+    "وقتی لپ‌تاپت را باز می‌کنی و می‌بینی ۷۲ درصد شارژ دارد، ولی شارژرش آنجاست!",
+    "وقتی دکمه ارسال را زدی و تازه فهمیدی غلط املایی داری!",
+    "وقتی می‌خواهی بی‌صدا بخندی ولی صدات مثل غاز درمی‌آید!",
+    "وقتی سعی می‌کنی از روی یک چیز کوچک بپری و خیلی نمایشی زمین می‌خوری!",
+    "وقتی می‌خواهی منطقی صحبت کنی ولی عصبانیت اجازه نمی‌دهد!",
+    "وقتی فکر می‌کنی یکی داره نگات می‌کنه، برمی‌گردی و واقعاً داره نگات می‌کنه!",
+    "وقتی زنگ می‌زنی به دوستت و می‌گه الان داشتم بهت زنگ می‌زدم!",
+    "وقتی کفشت را پیدا نمی‌کنی و می‌بینی یکی پای خودته!",
+    "وقتی می‌خواهی آرام آب بخوری و ناگهان سرفه‌ات می‌گیرد!",
+    "وقتی در مهمانی اسم کسی را فراموش می‌کنی و فقط لبخند می‌زنی!",
+    "وقتی می‌خواهی خیلی حرفه‌ای فایل را ذخیره کنی و کامپیوتر هنگ می‌کند!",
+    "وقتی با خودت می‌گویی فقط ۵ دقیقه می‌خوابم و ۳ ساعت بعد بیدار می‌شوی!",
+    "وقتی چیزی را زمین می‌اندازی و همه دقیقاً نگاه می‌کنند!",
+    "وقتی می‌خواهی از در رد شوی و لباست به دستگیره گیر می‌کند!",
+    "وقتی می‌بینی چیزی که دنبالش بودی، دقیقاً جلوی چشمت بوده!",
+    "وقتی می‌خواهی جدی باشی ولی یک اتفاق بی‌ربط کل فضا را منفجر می‌کند!"
 ]
 
 
@@ -116,6 +94,7 @@ def get_game(chat_id):
         games[chat_id] = {
 
             "started": False,
+
             "host": None,
 
             "players": {},
@@ -130,11 +109,11 @@ def get_game(chat_id):
 
             "votes": {},
 
-            "voted_users": set(),
-
             "used_scenarios": [],
 
-            "voting": False
+            "voting": False,
+
+            "current_scenario": None
         }
 
     return games[chat_id]
@@ -143,31 +122,52 @@ def get_game(chat_id):
 def get_new_scenario(game):
 
     available = [
-        s for s in SCENARIOS
+
+        s
+
+        for s in SCENARIOS
+
         if s not in game["used_scenarios"]
     ]
 
     if not available:
+
         game["used_scenarios"] = []
+
         available = SCENARIOS.copy()
 
-    scenario = random.choice(available)
+    scenario = random.choice(
+        available
+    )
 
-    game["used_scenarios"].append(scenario)
+    game["used_scenarios"].append(
+        scenario
+    )
 
     return scenario
-    # =========================
+
+
+# =========================
 # HELP
 # =========================
+
+@dp.message(Command("help"))
+async def help_alias(message: Message):
+
+    await helpp(message)
+
 
 @dp.message(Command("helpp"))
 async def helpp(message: Message):
 
     text = """
-🎮 راهنمای GIF Challenge
+🎮 راهنمای کامل GIF Challenge
 
 /start
 فعال سازی ربات
+
+/help
+نمایش راهنما
 
 /info
 اطلاعات سازنده
@@ -178,30 +178,35 @@ async def helpp(message: Message):
 /join
 ورود به بازی
 
+/players
+نمایش بازیکنان
+
 /startgame
 شروع بازی
 
 /scoreboard
-جدول امتیازات
+نمایش جدول امتیازات
+
+/endvote
+پایان رأی گیری توسط Host
 
 /end_game
-پایان بازی
+پایان بازی توسط Host
 
 📌 قوانین
 
-• بازی فقط در گروه انجام می‌شود
+• فقط در گروه کار می‌کند
+• حداقل ۲ بازیکن لازم است
 • هر بازی ۱۵ راند دارد
 • هر نفر فقط یک GIF در هر راند
-• هر نفر می‌تواند به چند GIF رأی دهد
-• رأی به خود مجاز نیست
-• در مساوی همه برندگان امتیاز می‌گیرند
-• پس از راند ۱۵ بازی خودکار تمام می‌شود
+• هر نفر می‌تواند به چند GIF رأی بدهد
+• رأی به خود ممنوع است
+• در صورت مساوی همه برندگان امتیاز می‌گیرند
+• بعد از راند ۱۵ بازی تمام می‌شود
 """
 
     await message.answer(text)
-
-
-# =========================
+    # =========================
 # INFO
 # =========================
 
@@ -209,7 +214,11 @@ async def helpp(message: Message):
 async def info(message: Message):
 
     await message.answer(
-        "🛠 ساخته شده توسط @Jack_landon"
+        "🎮 GIF Challenge Bot\n\n"
+        "🛠 سازنده: @Jack_landon\n"
+        "⚡ نسخه: 2.0\n"
+        "🎯 بازی گروهی GIF Challenge\n"
+        "📖 راهنما: /help"
     )
 
 
@@ -221,7 +230,11 @@ async def info(message: Message):
 async def start(message: Message):
 
     await message.answer(
-        "🎮 GIF Challenge Bot فعال شد\n\n/newgame"
+        "🎮 GIF Challenge Bot فعال شد!\n\n"
+        "برای ساخت بازی:\n"
+        "/newgame\n\n"
+        "برای راهنما:\n"
+        "/help"
     )
 
 
@@ -237,18 +250,35 @@ async def newgame(message: Message):
         "supergroup"
     ]:
         return await message.answer(
-            "❌ فقط داخل گروه"
+            "❌ این بازی فقط داخل گروه کار می‌کند"
         )
+
+    current = get_game(
+        message.chat.id
+    )
+
+    if current["started"]:
+
+        return await message.answer(
+            "⚠️ یک بازی در حال اجراست"
+        )
+
+    host_id = message.from_user.id
 
     games[message.chat.id] = {
 
         "started": False,
 
-        "host": message.from_user.id,
+        "host": host_id,
 
-        "players": {},
+        "players": {
+            host_id:
+            message.from_user.first_name
+        },
 
-        "scores": {},
+        "scores": {
+            host_id: 0
+        },
 
         "round": 0,
 
@@ -258,16 +288,18 @@ async def newgame(message: Message):
 
         "votes": {},
 
-        "voted_users": set(),
-
         "used_scenarios": [],
 
-        "voting": False
+        "voting": False,
+
+        "current_scenario": None
     }
 
     await message.answer(
         f"🎮 بازی جدید ساخته شد\n\n"
-        f"👑 Host: {message.from_user.first_name}\n\n"
+        f"👑 Host: {message.from_user.first_name}\n"
+        f"✅ Host به بازی اضافه شد\n\n"
+        f"برای ورود:\n"
         f"/join"
     )
 
@@ -279,12 +311,20 @@ async def newgame(message: Message):
 @dp.message(Command("join"))
 async def join(message: Message):
 
-    game = get_game(message.chat.id)
+    game = get_game(
+        message.chat.id
+    )
+
+    if game["host"] is None:
+
+        return await message.answer(
+            "❌ ابتدا /newgame اجرا شود"
+        )
 
     if game["started"]:
 
         return await message.answer(
-            "⚠️ بازی شروع شده"
+            "⚠️ بازی شروع شده است"
         )
 
     uid = message.from_user.id
@@ -292,7 +332,7 @@ async def join(message: Message):
     if uid in game["players"]:
 
         return await message.answer(
-            "⚠️ قبلاً وارد شدی"
+            "⚠️ قبلاً وارد بازی شدی"
         )
 
     game["players"][uid] = (
@@ -307,18 +347,53 @@ async def join(message: Message):
 
 
 # =========================
+# PLAYERS
+# =========================
+
+@dp.message(Command("players"))
+async def players(message: Message):
+
+    game = get_game(
+        message.chat.id
+    )
+
+    if not game["players"]:
+
+        return await message.answer(
+            "❌ هنوز بازیکنی وجود ندارد"
+        )
+
+    text = "👥 بازیکنان بازی\n\n"
+
+    for i, name in enumerate(
+        game["players"].values(),
+        start=1
+    ):
+
+        text += f"{i}. {name}\n"
+
+    await message.answer(text)
+    # =========================
 # START GAME
 # =========================
 
 @dp.message(Command("startgame"))
 async def startgame(message: Message):
 
-    game = get_game(message.chat.id)
+    game = get_game(
+        message.chat.id
+    )
 
     if game["host"] != message.from_user.id:
 
         return await message.answer(
             "⛔ فقط Host می‌تواند بازی را شروع کند"
+        )
+
+    if game["started"]:
+
+        return await message.answer(
+            "⚠️ بازی قبلاً شروع شده است"
         )
 
     if len(game["players"]) < 2:
@@ -337,15 +412,18 @@ async def startgame(message: Message):
 
     game["votes"] = {}
 
-    game["voted_users"] = set()
+    game["voting"] = False
 
-    scenario = get_new_scenario(game)
+    scenario = get_new_scenario(
+        game
+    )
+
+    game["current_scenario"] = scenario
 
     await message.answer(
-
         f"🚀 راند 1 از {MAX_ROUNDS}\n\n"
         f"😂 {scenario}\n\n"
-        f"🎞 GIF مناسب را ارسال کنید"
+        f"🎞 هر بازیکن یک GIF ارسال کند"
     )
 
 
@@ -356,12 +434,14 @@ async def startgame(message: Message):
 @dp.message(Command("scoreboard"))
 async def scoreboard(message: Message):
 
-    game = get_game(message.chat.id)
+    game = get_game(
+        message.chat.id
+    )
 
     if not game["scores"]:
 
         return await message.answer(
-            "امتیازی ثبت نشده"
+            "❌ امتیازی ثبت نشده"
         )
 
     ranking = sorted(
@@ -387,13 +467,43 @@ async def scoreboard(message: Message):
 
 
 # =========================
+# END VOTE
+# =========================
+
+@dp.message(Command("endvote"))
+async def endvote(message: Message):
+
+    game = get_game(
+        message.chat.id
+    )
+
+    if game["host"] != message.from_user.id:
+
+        return await message.answer(
+            "⛔ فقط Host"
+        )
+
+    if not game["voting"]:
+
+        return await message.answer(
+            "❌ رأی گیری فعال نیست"
+        )
+
+    await finish_round(
+        message.chat.id
+    )
+
+
+# =========================
 # END GAME
 # =========================
 
 @dp.message(Command("end_game"))
 async def end_game(message: Message):
 
-    game = get_game(message.chat.id)
+    game = get_game(
+        message.chat.id
+    )
 
     if game["host"] != message.from_user.id:
 
@@ -411,12 +521,15 @@ async def end_game(message: Message):
 @dp.message(F.animation)
 async def gif_handler(message: Message):
 
-    game = get_game(message.chat.id)
+    game = get_game(
+        message.chat.id
+    )
 
     if not game["started"]:
         return
 
     if game["voting"]:
+
         return await message.reply(
             "⛔ رأی گیری در حال انجام است"
         )
@@ -446,6 +559,12 @@ async def gif_handler(message: Message):
 
         game["voting"] = True
 
+        asyncio.create_task(
+            auto_finish_vote(
+                message.chat.id
+            )
+        )
+
         await message.answer(
             "🗳 رأی گیری آغاز شد!"
         )
@@ -469,10 +588,58 @@ async def gif_handler(message: Message):
                 reply_markup=keyboard
             )
 
-        await message.answer(
-            "📌 می‌توانید به چند GIF رأی بدهید\n"
-            "❌ رأی به خود مجاز نیست"
+
+# =========================
+# GIF DOCUMENT
+# =========================
+
+@dp.message(F.document)
+async def gif_document(
+    message: Message
+):
+
+    if not message.document:
+        return
+
+    if (
+        message.document.mime_type
+        != "image/gif"
+    ):
+        return
+
+    game = get_game(
+        message.chat.id
+    )
+
+    if not game["started"]:
+        return
+
+    if game["voting"]:
+
+        return await message.reply(
+            "⛔ رأی گیری در حال انجام است"
         )
+
+    uid = message.from_user.id
+
+    if uid not in game["players"]:
+        return
+
+    if uid in game["submitted"]:
+
+        return await message.reply(
+            "⛔ قبلاً GIF ارسال کردی"
+        )
+
+    game["submitted"].add(uid)
+
+    game["gifs"][uid] = (
+        message.document.file_id
+    )
+
+    await message.reply(
+        "✅ GIF ثبت شد"
+    )
 
 
 # =========================
@@ -486,6 +653,9 @@ async def vote_handler(
     call: CallbackQuery
 ):
 
+    if not call.message:
+        return
+
     game = get_game(
         call.message.chat.id
     )
@@ -493,7 +663,7 @@ async def vote_handler(
     if not game["voting"]:
 
         return await call.answer(
-            "رأی گیری بسته شده"
+            "⛔ رأی گیری بسته شده"
         )
 
     voter = call.from_user.id
@@ -504,9 +674,17 @@ async def vote_handler(
             "عضو بازی نیستی"
         )
 
-    target = int(
-        call.data.split("_")[1]
-    )
+    try:
+
+        target = int(
+            call.data.split("_")[1]
+        )
+
+    except:
+
+        return await call.answer(
+            "خطا"
+        )
 
     if voter == target:
 
@@ -522,7 +700,7 @@ async def vote_handler(
     if target in game["votes"][voter]:
 
         return await call.answer(
-            "قبلاً رأی دادی"
+            "⚠️ قبلاً رأی دادی"
         )
 
     game["votes"][voter].add(
@@ -533,32 +711,40 @@ async def vote_handler(
         "✅ رأی ثبت شد"
     )
 
-    total_votes = sum(
-        len(v)
-        for v in game["votes"].values()
+
+# =========================
+# AUTO FINISH VOTE
+# =========================
+
+async def auto_finish_vote(
+    chat_id
+):
+
+    await asyncio.sleep(
+        120
     )
 
-    players_count = len(
-        game["players"]
+    game = get_game(
+        chat_id
     )
 
-    max_votes_needed = (
-        players_count *
-        (players_count - 1)
-    )
-
-    if total_votes >= max_votes_needed:
+    if game["voting"]:
 
         await finish_round(
-            call.message.chat.id
+            chat_id
         )
-        # =========================
+
+
+# =========================
 # FINISH ROUND
 # =========================
 
 async def finish_round(chat_id):
 
     game = get_game(chat_id)
+
+    if not game["started"]:
+        return
 
     game["voting"] = False
 
@@ -601,11 +787,6 @@ async def finish_round(chat_id):
                 f" (+1 امتیاز)\n"
             )
 
-        result_text += (
-            f"\n📊 تعداد رأی برنده: "
-            f"{max_vote}"
-        )
-
         await bot.send_message(
             chat_id,
             result_text
@@ -624,8 +805,6 @@ async def finish_round(chat_id):
 
     game["votes"] = {}
 
-    game["voted_users"] = set()
-
     if game["round"] >= MAX_ROUNDS:
 
         await end_game_internal(
@@ -640,17 +819,17 @@ async def finish_round(chat_id):
         game
     )
 
+    game["current_scenario"] = scenario
+
     await bot.send_message(
 
         chat_id,
 
-        f"🚀 راند "
-        f"{game['round']} از "
-        f"{MAX_ROUNDS}\n\n"
+        f"🚀 راند {game['round']} از {MAX_ROUNDS}\n\n"
 
         f"😂 {scenario}\n\n"
 
-        f"🎞 GIF ارسال کنید"
+        f"🎞 هر بازیکن یک GIF ارسال کند"
     )
 
 
@@ -662,7 +841,9 @@ async def end_game_internal(
     chat_id
 ):
 
-    game = get_game(chat_id)
+    game = get_game(
+        chat_id
+    )
 
     ranking = sorted(
 
@@ -673,9 +854,7 @@ async def end_game_internal(
         reverse=True
     )
 
-    text = (
-        "🏁 پایان بازی\n\n"
-    )
+    text = "🏁 پایان بازی\n\n"
 
     if ranking:
 
@@ -699,7 +878,7 @@ async def end_game_internal(
                 f"🏆 "
                 f"{game['players'][uid]}"
                 f" - "
-                f"{best_score}\n"
+                f"{best_score} امتیاز\n"
             )
 
         text += "\n"
@@ -709,20 +888,8 @@ async def end_game_internal(
         start=1
     ):
 
-        if i == 1:
-            medal = "🥇"
-
-        elif i == 2:
-            medal = "🥈"
-
-        elif i == 3:
-            medal = "🥉"
-
-        else:
-            medal = "🏅"
-
         text += (
-            f"{medal} "
+            f"{i}. "
             f"{game['players'][uid]}"
             f" - {score}\n"
         )
@@ -732,34 +899,14 @@ async def end_game_internal(
         text
     )
 
-    games[chat_id] = {
-
-        "started": False,
-
-        "host": None,
-
-        "players": {},
-
-        "scores": {},
-
-        "round": 0,
-
-        "submitted": set(),
-
-        "gifs": {},
-
-        "votes": {},
-
-        "voted_users": set(),
-
-        "used_scenarios": [],
-
-        "voting": False
-    }
+    games.pop(
+        chat_id,
+        None
+    )
 
 
 # =========================
-# UNKNOWN COMMAND
+# UNKNOWN
 # =========================
 
 @dp.message()
@@ -769,8 +916,8 @@ async def unknown(
 
     await message.answer(
         "❓ دستور نامعتبر\n\n"
-        "برای راهنما:\n"
-        "/helpp"
+        "📖 راهنما:\n"
+        "/help"
     )
 
 
@@ -779,10 +926,6 @@ async def unknown(
 # =========================
 
 async def main():
-
-    print(
-        "GIF Challenge Bot Started..."
-    )
 
     await dp.start_polling(
         bot
